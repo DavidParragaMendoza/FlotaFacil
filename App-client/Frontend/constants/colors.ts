@@ -1,0 +1,33 @@
+export const colors = {
+  primary: "#2563EB",
+  primaryDark: "#0F172A",
+  primaryActive: "#1D4ED8",
+  primarySoft: "#DBEAFE",
+  primarySoftBorder: "#BFDBFE",
+  background: "#F1F5F9",
+  backgroundSoft: "#F8FAFC",
+  surface: "#FFFFFF",
+  card: "#FFFFFF",
+
+  textPrimary: "#0F172A",
+  textSecondary: "#64748B",
+  textMuted: "#94A3B8",
+  textLight: "#FFFFFF",
+  textOnDarkMuted: "#CBD5E1",
+
+  success: "#22C55E",
+  successSoft: "#DCFCE7",
+  successText: "#15803D",
+  warning: "#F59E0B",
+  warningSoft: "#FEF3C7",
+  warningText: "#92400E",
+  danger: "#EF4444",
+  error: "#EF4444",
+  dangerSoft: "#FEE2E2",
+  dangerText: "#DC2626",
+
+  border: "#E2E8F0",
+  overlay: "rgba(15, 23, 42, 0.55)",
+  disabled: "#CBD5E1",
+  disabledText: "#64748B",
+};

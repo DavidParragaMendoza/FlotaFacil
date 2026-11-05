@@ -1,0 +1,264 @@
+import type { FastifyInstance } from "fastify";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
+import { createMyRequestSchema } from "@/contracts/requests/create-my-request-schema";
+import { createRequestSchema } from "@/contracts/requests/create-request-schema";
+import { myRequestResponseSchema } from "@/contracts/requests/my-request-response-schema";
+import {
+	requestIdParamSchema,
+	requestUserIdParamSchema,
+	requestVehicleIdParamSchema,
+} from "@/contracts/requests/request-params-schema";
+import {
+	requestResponseSchema,
+	requestWithRelationsResponseSchema,
+} from "@/contracts/requests/request-response-schema";
+import { requestScheduleResponseSchema } from "@/contracts/requests/request-schedule-response-schema";
+import { updateMyRequestSchema } from "@/contracts/requests/update-my-request-schema";
+import { USER_ROLES } from "@/domains/users/roles";
+import { authorize } from "@/hooks/authorize";
+import { verifyJwt } from "@/hooks/verify-jwt";
+import { approveRequestUseCase } from "@/use-cases/requests/approve-request";
+import { createMyRequestUseCase } from "@/use-cases/requests/create-my-request";
+import { createRequestUseCase } from "@/use-cases/requests/create-request";
+import { fetchMyRequestsUseCase } from "@/use-cases/requests/fetch-my-requests";
+import { fetchPendingRequestsUseCase } from "@/use-cases/requests/fetch-pending-requests";
+import { fetchRequestsUseCase } from "@/use-cases/requests/fetch-requests";
+import { fetchUserRequestsUseCase } from "@/use-cases/requests/fetch-user-requests";
+import { fetchVehicleRequestsUseCase } from "@/use-cases/requests/fetch-vehicle-requests";
+import { fetchVehicleScheduleUseCase } from "@/use-cases/requests/fetch-vehicle-schedule";
+import { rejectRequestUseCase } from "@/use-cases/requests/reject-request";
+import { updateMyRequestUseCase } from "@/use-cases/requests/update-my-request";
+
+const vehicleScheduleQuerySchema = z.object({
+	date: z
+		.string()
+		.regex(/^\d{4}-\d{2}-\d{2}$/)
+		.optional(),
+	ignoredRequestId: z.uuid().optional(),
+});
+
+export async function requestRouter(app: FastifyInstance) {
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/me/requests",
+		{
+			preHandler: [verifyJwt],
+			schema: {
+				response: {
+					200: myRequestResponseSchema.array(),
+				},
+			},
+		},
+		async (request, reply) => {
+			const requests = await fetchMyRequestsUseCase(request.user.id);
+
+			return reply.status(200).send(requests);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().post(
+		"/me/requests",
+		{
+			preHandler: [verifyJwt],
+			schema: {
+				body: createMyRequestSchema,
+				response: {
+					201: myRequestResponseSchema,
+				},
+			},
+		},
+		async (request, reply) => {
+			const createdRequest = await createMyRequestUseCase(
+				request.user.id,
+				request.body,
+			);
+
+			return reply.status(201).send(createdRequest);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().patch(
+		"/me/requests/:requestId",
+		{
+			preHandler: [verifyJwt],
+			schema: {
+				params: requestIdParamSchema,
+				body: updateMyRequestSchema,
+				response: {
+					200: myRequestResponseSchema,
+				},
+			},
+		},
+		async (request, reply) => {
+			const updatedRequest = await updateMyRequestUseCase(
+				request.user.id,
+				request.params.requestId,
+				request.body,
+			);
+
+			return reply.status(200).send(updatedRequest);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().post(
+		"/requests",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[0], USER_ROLES[1]])],
+			schema: {
+				body: createRequestSchema,
+				response: {
+					201: requestResponseSchema,
+				},
+			},
+		},
+		async (request, reply) => {
+			const input =
+				request.user.role === USER_ROLES[0]
+					? { ...request.body, userId: request.user.id }
+					: request.body;
+			const createdRequest = await createRequestUseCase(input, request.user.id);
+
+			return reply.status(201).send(createdRequest);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/requests/:userId",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[0], USER_ROLES[1]])],
+			schema: {
+				params: requestUserIdParamSchema,
+				response: {
+					200: requestResponseSchema.array(),
+				},
+			},
+		},
+		async (request, reply) => {
+			const userId =
+				request.user.role === USER_ROLES[0]
+					? request.user.id
+					: request.params.userId;
+			const requests = await fetchUserRequestsUseCase(userId);
+
+			return reply.status(200).send(requests);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/admin/requests/pending",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[1]])],
+			schema: {
+				response: {
+					200: requestWithRelationsResponseSchema.array(),
+				},
+			},
+		},
+		async (_, reply) => {
+			const requests = await fetchPendingRequestsUseCase();
+
+			return reply.status(200).send(requests);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/admin/requests/:vehicleId",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[1]])],
+			schema: {
+				params: requestVehicleIdParamSchema,
+				response: {
+					200: requestWithRelationsResponseSchema.array(),
+				},
+			},
+		},
+		async (request, reply) => {
+			const requests = await fetchVehicleRequestsUseCase(
+				request.params.vehicleId,
+			);
+
+			return reply.status(200).send(requests);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/requests/:vehicleId/schedule",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[0], USER_ROLES[1]])],
+			schema: {
+				params: requestVehicleIdParamSchema,
+				querystring: vehicleScheduleQuerySchema,
+				response: {
+					200: requestScheduleResponseSchema.array(),
+				},
+			},
+		},
+		async (request, reply) => {
+			const schedule = await fetchVehicleScheduleUseCase(
+				request.params.vehicleId,
+				request.query,
+			);
+
+			return reply.status(200).send(schedule);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().put(
+		"/admin/requests/:requestId/approve",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[1]])],
+			schema: {
+				params: requestIdParamSchema,
+				response: {
+					200: requestResponseSchema,
+				},
+			},
+		},
+		async (request, reply) => {
+			const updatedRequest = await approveRequestUseCase(
+				request.params.requestId,
+				request.user.id,
+			);
+
+			return reply.status(200).send(updatedRequest);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().put(
+		"/admin/requests/:requestId/reject",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[1]])],
+			schema: {
+				params: requestIdParamSchema,
+				response: {
+					200: requestResponseSchema,
+				},
+			},
+		},
+		async (request, reply) => {
+			const updatedRequest = await rejectRequestUseCase(
+				request.params.requestId,
+				request.user.id,
+			);
+
+			return reply.status(200).send(updatedRequest);
+		},
+	);
+
+	app.withTypeProvider<ZodTypeProvider>().get(
+		"/admin/requests",
+		{
+			preHandler: [verifyJwt, authorize([USER_ROLES[1]])],
+			schema: {
+				response: {
+					200: requestResponseSchema.array(),
+				},
+			},
+		},
+		async (_, reply) => {
+			const requests = await fetchRequestsUseCase();
+
+			return reply.status(200).send(requests);
+		},
+	);
+}

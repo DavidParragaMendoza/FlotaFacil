@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      context: .
+      target: dev
+    environment:
+      APP_HOST: ${APP_HOST:-0.0.0.0}
+      APP_PORT: ${APP_PORT:-8080}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-host.docker.internal}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-admin}
+      RABBITMQ_TRACKING_EXCHANGE: ${RABBITMQ_TRACKING_EXCHANGE:-tracking}
+      RABBITMQ_TRACKING_ROUTING_KEY: ${RABBITMQ_TRACKING_ROUTING_KEY:-tracking.updated}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    restart: unless-stopped
+
+volumes:
+  go-mod-cache:
+  go-build-cache:

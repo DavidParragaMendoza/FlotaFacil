@@ -1,0 +1,45 @@
+import React from "react";
+import { TouchableOpacity, Text, StyleSheet } from "react-native";
+import { router } from "expo-router";
+import { colors } from "../../constants/colors";
+
+
+type Props = {
+  title?: string;
+  onPress?: () => void;
+};
+
+export function RequestButton({ title = "Solicitar veículo", onPress }: Props) {
+  return (
+    <TouchableOpacity
+      style={styles.button}
+      onPress={onPress ?? (() => router.push("/addrequest"))}
+    >
+      <Text style={styles.icon}>＋</Text>
+      <Text style={styles.text}>{title}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginTop: 16,
+  },
+  icon: {
+    fontSize: 18,
+    marginRight: 8,
+    fontWeight: "bold",
+  },
+  text: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textLight,
+  },
+});

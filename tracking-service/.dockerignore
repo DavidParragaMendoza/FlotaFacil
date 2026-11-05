@@ -1,0 +1,8 @@
+.git
+.codex
+.agents
+tmp
+bin
+coverage.out
+*.log
+.env

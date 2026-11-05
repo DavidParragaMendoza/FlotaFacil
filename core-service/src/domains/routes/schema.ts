@@ -1,0 +1,38 @@
+import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { requests } from "@/domains/requests/schema";
+import {
+	ROUTE_STATUS,
+	ROUTES_STATUSES,
+	type routeStatuses,
+} from "@/domains/routes/status";
+
+export const routes = pgTable("routes", {
+	id: uuid("id").primaryKey().defaultRandom(),
+
+	requestId: uuid("request_id")
+		.notNull()
+		.unique()
+		.references(() => requests.id, {
+			onDelete: "cascade",
+		}),
+
+	status: text("status", { enum: ROUTES_STATUSES })
+		.notNull()
+		.$type<routeStatuses>()
+		.default(ROUTE_STATUS.PENDING),
+
+	description: text("description"),
+
+	reportMarkdown: text("report_markdown"),
+
+	startedAt: timestamp("started_at"),
+
+	finishedAt: timestamp("finished_at"),
+
+	createdAt: timestamp("created_at").defaultNow().notNull(),
+
+	updatedAt: timestamp("updated_at")
+		.defaultNow()
+		.$onUpdateFn(() => new Date())
+		.notNull(),
+});

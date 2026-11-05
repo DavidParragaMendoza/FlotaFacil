@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "SIF",
+    "slug": "sif",
+    "jsEngine": "hermes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/adaptive-icon.png",
+    "scheme": "frontend-app",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "icon": "./assets/images/adaptive-icon.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "O SIF usa sua localização durante viagens em andamento para monitoramento da frota.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "O SIF usa sua localização durante viagens em andamento para monitoramento da frota mesmo em segundo plano."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.everton5gems.sif",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "web": {
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#1B3A5C"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O SIF usa sua localização durante viagens em andamento para monitoramento da frota.",
+          "locationAlwaysAndWhenInUsePermission": "O SIF usa sua localização durante viagens em andamento para monitoramento da frota mesmo em segundo plano.",
+          "locationAlwaysPermission": "O SIF usa sua localização durante viagens em andamento para monitoramento da frota mesmo em segundo plano.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      "expo-background-task"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "effed79d-b036-4338-81a7-543457ed4355"
+      }
+    }
+  }
+}
