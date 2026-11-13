@@ -59,22 +59,22 @@ A inspeção direta do diretório local (`FlotaFacil/`) estabelece a seguinte li
 
 ### 0.3 Tarefas de Nivelamento de Diagnóstico e Infraestrutura Local
 
-- [ ] **T0.1 — Validação completa de inicialização dos contêineres e integridade do ambiente**  
+- [x] **T0.1 — Validação completa de inicialização dos contêineres e integridade do ambiente**  
   - **Responsável:** `[A definir]`  
   - **Descrição:** Inicializar sequencialmente `core-service/compose.dev.yml`, `notification-service/compose.yml`, `tracking-service/docker-compose.yml`, `ai-service/compose.yml` e `observability/docker-compose.yml`. Confirmar o status `healthy`/`Up` de todos os serviços de suporte e validar o login administrativo no `admin-app` (`http://localhost:3000`) com a conta semente (`000.000.000-00` / `123456`).  
   - **Critério de Aceitação:** Registro de `docker ps` íntegro e autenticação funcional no painel administrativo.
 
-- [ ] **T0.2 — Execução e registro da linha de base (*baseline*) de testes existentes**  
+- [x] **T0.2 — Execução e registro da linha de base (*baseline*) de testes existentes**  
   - **Responsável:** `[A definir]`  
   - **Descrição:** Executar as suítes já existentes nos repositórios: `npm.cmd run test` e `npm.cmd run lint` no `core-service`, `go test ./...` no `tracking-service` e `npm.cmd run lint` / `npm.cmd run build` no `admin-app`. Documentar a quantidade inicial de testes e o tempo de execução.  
   - **Critério de Aceitação:** Relatório quantitativo inicial registrado para comparação evolutiva na 2ª Entrega.
 
-- [ ] **T0.3 — Alinhamento das portas de coleta de métricas no Prometheus/Grafana (`/metrics`)**  
+- [x] **T0.3 — Alinhamento das portas de coleta de métricas no Prometheus/Grafana (`/metrics`)**  
   - **Responsável:** `[A definir]`  
   - **Descrição:** Corrigir a divergência entre `observability/prometheus/prometheus.yml` (configurado para `host.docker.internal:3334` no `tracking-service` e `3335` no `notification-service`) e as portas efetivamente expostas nos arquivos `docker-compose` (`8080` e `3331`), garantindo que os 3 *targets* (`core-service`, `tracking-service` e `notification-service`) fiquem com status **`UP`** em `http://localhost:9090/targets`.  
   - **Critério de Aceitação:** Todos os *targets* ativos no Prometheus e populando corretamente os dashboards `SIF` no Grafana (`http://localhost:3001`).
 
-- [ ] **T0.4 — Mapeamento arquitetural das filas RabbitMQ e diagnóstico de ausência de DLQ**  
+- [x] **T0.4 — Mapeamento arquitetural das filas RabbitMQ e diagnóstico de ausência de DLQ**  
   - **Responsável:** `[A definir]`  
   - **Descrição:** Documentar a topologia atual de mensageria: exchanges `events` e `tracking` (tipo `topic`, duráveis) e filas `notification.solicitation.created` e `tracking.coordinates.updated`. Registrar tecnicamente a ausência atual de parâmetros `x-dead-letter-exchange` (DLX) e de filas `.dlq`, subsidiando a especificação da 1ª Entrega e a implementação de resiliência da 2ª Entrega.  
   - **Critério de Aceitação:** Diagrama comparativo da topologia atual versus topologia resiliente com DLQ.

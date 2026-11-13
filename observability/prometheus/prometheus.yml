@@ -20,7 +20,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - host.docker.internal:3334
+          - host.docker.internal:8080
         labels:
           project: sif
           service: tracking-service
@@ -30,7 +30,7 @@ scrape_configs:
     metrics_path: /metrics
     static_configs:
       - targets:
-          - host.docker.internal:3335
+          - host.docker.internal:3331
         labels:
           project: sif
           service: notification-service

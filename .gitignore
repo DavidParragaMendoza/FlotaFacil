@@ -24,3 +24,6 @@ coverage/
 Thumbs.db
 .vscode/
 *.log
+
+.github
+

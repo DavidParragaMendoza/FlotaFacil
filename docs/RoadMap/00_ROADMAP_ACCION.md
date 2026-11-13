@@ -59,22 +59,22 @@ La inspección directa del entorno local (`FlotaFacil/`) arroja la siguiente lí
 
 ### 0.3 Tareas de Nivelación de Diagnóstico e Infraestructura Local
 
-- [ ] **T0.1 — Verificación integral de arranque multi-contenedor y salud del entorno**  
+- [x] **T0.1 — Verificación integral de arranque multi-contenedor y salud del entorno**  
   - **Responsable:** `[Sin asignar]`  
   - **Descripción:** Levantar secuencialmente `core-service/compose.dev.yml`, `notification-service/compose.yml`, `tracking-service/docker-compose.yml`, `ai-service/compose.yml` y `observability/docker-compose.yml`. Verificar que todos los contenedores reporten estado `healthy`/`Up` y que `admin-app` (`http://localhost:3000`) autentique correctamente con el usuario semilla (`000.000.000-00` / `123456`).  
   - **Criterio de Aceptación:** Captura o registro de `docker ps` saludable y login exitoso en `admin-app`.
 
-- [ ] **T0.2 — Auditoría y ejecución de líneas base de pruebas existentes**  
+- [x] **T0.2 — Auditoría y ejecución de líneas base de pruebas existentes**  
   - **Responsable:** `[Sin asignar]`  
   - **Descripción:** Ejecutar las suites actualmente presentes en el código: `npm.cmd run test` y `npm.cmd run lint` dentro de `core-service`, `go test ./...` dentro de `tracking-service`, y `npm.cmd run lint` / `npm.cmd run build` dentro de `admin-app`. Documentar tiempos de ejecución y número inicial de tests existentes.  
   - **Criterio de Aceptación:** Registro cuantitativo del punto de partida (línea base) antes de iniciar la ampliación de cobertura.
 
-- [ ] **T0.3 — Alineación de puertos de telemetría Prometheus/Grafana (`/metrics`)**  
+- [x] **T0.3 — Alineación de puertos de telemetría Prometheus/Grafana (`/metrics`)**  
   - **Responsable:** `[Sin asignar]`  
   - **Descripción:** Corregir la discrepancia detectada entre `observability/prometheus/prometheus.yml` (que consulta `host.docker.internal:3334` para `tracking-service` y `3335` para `notification-service`) y los puertos reales expuestos en sus respectivos `docker-compose` (`8080` y `3331`), verificando que los 3 *targets* (`core-service`, `tracking-service`, `notification-service`) aparezcan en estado **`UP`** en `http://localhost:9090/targets`.  
   - **Criterio de Aceptación:** Todos los servicios instrumentados visibles en estado `UP` en Prometheus y reflejando métricas en los paneles `SIF` de Grafana (`http://localhost:3001`).
 
-- [ ] **T0.4 — Diagnóstico arquitectónico de colas RabbitMQ y brecha de DLQ**  
+- [x] **T0.4 — Diagnóstico arquitectónico de colas RabbitMQ y brecha de DLQ**  
   - **Responsable:** `[Sin asignar]`  
   - **Descripción:** Documentar la topología actual de mensajería: exchanges `events` y `tracking` (`topic`, durables) y colas `notification.solicitation.created` y `tracking.coordinates.updated`. Registrar formalmente que ninguna de las dos colas declara aún `x-dead-letter-exchange` (DLX) ni cola `.dlq`, insumo clave para el diseño de la 1ª Entrega y la implementación de resiliencia de la 2ª Entrega.  
   - **Criterio de Aceptación:** Diagrama de topología actual vs. topología objetivo con DLQ validado técnicamente.
