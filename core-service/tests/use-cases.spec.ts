@@ -69,6 +69,14 @@ vi.mock("@/services/ai-report-service", () => ({
 	requestRouteReportFromAiService: vi.fn(),
 }));
 
+vi.mock("@/services/locationiq-static-map-service", () => ({
+	generateTrackingStaticMap: vi.fn(),
+}));
+
+vi.mock("@/minio/save-tracking-map", () => ({
+	saveTrackingMapToMinio: vi.fn(),
+}));
+
 vi.mock("@/use-cases/audit-log-service", () => ({
 	createAuditLog: vi.fn(),
 }));
@@ -152,6 +160,7 @@ import { startRouteUseCase } from "@/use-cases/routes/start-route";
 import { createTrackUseCase } from "@/use-cases/tracks/create-track";
 import { fetchRouteTracksUseCase } from "@/use-cases/tracks/fetch-route-tracks";
 import { createUserUseCase } from "@/use-cases/users/create-user";
+import { fetchUsersUseCase } from "@/use-cases/users/fetch-users";
 import { updateUserUseCase } from "@/use-cases/users/update-user";
 import { registerVehicle } from "@/use-cases/vehicles/register-vehicle";
 import { updateVehicle } from "@/use-cases/vehicles/update-vehicle";
@@ -195,7 +204,7 @@ function makeVehicle(overrides = {}) {
 		odometer: 1200,
 		imageUrl: null,
 		status: VEHICLE_STATUSES[0],
-		type: "CAR",
+		type: "CAR" as const,
 		createdAt,
 		updatedAt,
 		...overrides,
@@ -413,7 +422,6 @@ describe("usuarios", () => {
 
 	it("retorna usuarios sem passwordHash ao listar", async () => {
 		vi.mocked(fetchUsers).mockResolvedValue([makeUser()]);
-		const { fetchUsersUseCase } = await import("@/use-cases/users/fetch-users");
 
 		const result = await fetchUsersUseCase();
 

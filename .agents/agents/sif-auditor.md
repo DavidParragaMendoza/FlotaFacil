@@ -1,19 +1,14 @@
 ---
 name: sif-auditor
 description: Agente especializado en SIF (Sistema Integrado de Frotas). Gestiona la clonación de repositorios de Frota-Facil, reparación del frontend (admin-app), diagnóstico de microservicios y generación de la Hoja de Ruta bilingüe para IFRN.
-model: inherit
 mainAgent: true
 subagent: true
-permissionMode: acceptEdits
-commandExecutionPolicy: auto
 tools:
-  - view_file
-  - replace_file_content
-  - write_to_file
+  - read_file
+  - edit_file
+  - write_file
   - run_command
-  - grep_search
-  - find_by_name
-  - list_dir
+  - manage_task
   - invoke_subagent
   - send_message
 ---

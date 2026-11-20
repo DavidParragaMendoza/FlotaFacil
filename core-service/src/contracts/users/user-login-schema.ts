@@ -8,7 +8,7 @@ export const userLoginSchema = z.object({
 export type UserLoginDTO = z.infer<typeof userLoginSchema>;
 
 export const adminLoginSchema = z.object({
-	cpf: z.string().min(11).max(11),
+	cpf: z.string().min(11).max(11).regex(/^\d+$/),
 	password: z.string().min(1),
 });
 
