@@ -1,0 +1,32 @@
+services:
+  core-scale:
+    image: sif-dev:latest
+    expose:
+      - "3333"
+    volumes:
+      - ../core-service:/app
+      - /app/node_modules
+    networks:
+      - sif-net-dev
+    env_file:
+      - ../core-service/.env.dev
+    restart: unless-stopped
+    command: npm run dev
+
+  core-lb:
+    image: nginx:alpine
+    container_name: sif-core-lb
+    ports:
+      - "3330:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - sif-net-dev
+    depends_on:
+      - core-scale
+    restart: unless-stopped
+
+networks:
+  sif-net-dev:
+    external: true
+    name: core-service_sif-net-dev

@@ -1,0 +1,211 @@
+﻿
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: observability/k6/load.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 15 max VUs, 1m15s max duration (incl. graceful stop):
+              * default: Up to 15 looping VUs for 45s over 4 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+
+
+running (0m01.0s), 01/15 VUs, 1 complete and 0 interrupted iterations
+default   [   1% ] 01/15 VUs  00.6s/45.0s
+
+running (0m02.0s), 01/15 VUs, 2 complete and 0 interrupted iterations
+default   [   4% ] 01/15 VUs  01.6s/45.0s
+
+running (0m03.0s), 02/15 VUs, 4 complete and 0 interrupted iterations
+default   [   6% ] 02/15 VUs  02.6s/45.0s
+
+running (0m04.0s), 02/15 VUs, 8 complete and 0 interrupted iterations
+default   [   8% ] 02/15 VUs  03.6s/45.0s
+
+running (0m05.0s), 02/15 VUs, 11 complete and 0 interrupted iterations
+default   [  10% ] 02/15 VUs  04.6s/45.0s
+
+running (0m06.0s), 03/15 VUs, 16 complete and 0 interrupted iterations
+default   [  13% ] 03/15 VUs  05.6s/45.0s
+
+running (0m07.0s), 03/15 VUs, 21 complete and 0 interrupted iterations
+default   [  15% ] 03/15 VUs  06.6s/45.0s
+
+running (0m08.0s), 04/15 VUs, 26 complete and 0 interrupted iterations
+default   [  17% ] 04/15 VUs  07.6s/45.0s
+
+running (0m09.0s), 04/15 VUs, 34 complete and 0 interrupted iterations
+default   [  19% ] 04/15 VUs  08.6s/45.0s
+
+running (0m10.0s), 04/15 VUs, 42 complete and 0 interrupted iterations
+default   [  21% ] 04/15 VUs  09.6s/45.0s
+
+running (0m11.0s), 05/15 VUs, 50 complete and 0 interrupted iterations
+default   [  24% ] 05/15 VUs  10.6s/45.0s
+
+running (0m12.0s), 05/15 VUs, 59 complete and 0 interrupted iterations
+default   [  26% ] 05/15 VUs  11.6s/45.0s
+
+running (0m13.0s), 05/15 VUs, 68 complete and 0 interrupted iterations
+default   [  28% ] 05/15 VUs  12.6s/45.0s
+
+running (0m14.0s), 05/15 VUs, 78 complete and 0 interrupted iterations
+default   [  30% ] 05/15 VUs  13.6s/45.0s
+
+running (0m15.0s), 06/15 VUs, 88 complete and 0 interrupted iterations
+default   [  33% ] 06/15 VUs  14.6s/45.0s
+
+running (0m16.0s), 06/15 VUs, 99 complete and 0 interrupted iterations
+default   [  35% ] 06/15 VUs  15.6s/45.0s
+
+running (0m17.0s), 06/15 VUs, 110 complete and 0 interrupted iterations
+default   [  37% ] 06/15 VUs  16.6s/45.0s
+
+running (0m18.0s), 06/15 VUs, 122 complete and 0 interrupted iterations
+default   [  39% ] 06/15 VUs  17.6s/45.0s
+
+running (0m19.0s), 07/15 VUs, 134 complete and 0 interrupted iterations
+default   [  41% ] 07/15 VUs  18.6s/45.0s
+
+running (0m20.0s), 07/15 VUs, 146 complete and 0 interrupted iterations
+default   [  44% ] 07/15 VUs  19.6s/45.0s
+
+running (0m21.0s), 07/15 VUs, 159 complete and 0 interrupted iterations
+default   [  46% ] 07/15 VUs  20.6s/45.0s
+
+running (0m22.0s), 07/15 VUs, 173 complete and 0 interrupted iterations
+default   [  48% ] 07/15 VUs  21.6s/45.0s
+
+running (0m23.0s), 08/15 VUs, 186 complete and 0 interrupted iterations
+default   [  50% ] 08/15 VUs  22.6s/45.0s
+
+running (0m24.0s), 08/15 VUs, 202 complete and 0 interrupted iterations
+default   [  53% ] 08/15 VUs  23.6s/45.0s
+
+running (0m25.0s), 08/15 VUs, 216 complete and 0 interrupted iterations
+default   [  55% ] 08/15 VUs  24.6s/45.0s
+
+running (0m26.0s), 08/15 VUs, 232 complete and 0 interrupted iterations
+default   [  57% ] 08/15 VUs  25.6s/45.0s
+
+running (0m27.0s), 09/15 VUs, 248 complete and 0 interrupted iterations
+default   [  59% ] 09/15 VUs  26.6s/45.0s
+
+running (0m28.0s), 09/15 VUs, 264 complete and 0 interrupted iterations
+default   [  61% ] 09/15 VUs  27.6s/45.0s
+
+running (0m29.0s), 09/15 VUs, 281 complete and 0 interrupted iterations
+default   [  64% ] 09/15 VUs  28.6s/45.0s
+
+running (0m30.0s), 09/15 VUs, 298 complete and 0 interrupted iterations
+default   [  66% ] 09/15 VUs  29.6s/45.0s
+
+running (0m31.0s), 10/15 VUs, 314 complete and 0 interrupted iterations
+default   [  68% ] 10/15 VUs  30.6s/45.0s
+
+running (0m32.0s), 10/15 VUs, 333 complete and 0 interrupted iterations
+default   [  70% ] 10/15 VUs  31.6s/45.0s
+
+running (0m33.0s), 11/15 VUs, 353 complete and 0 interrupted iterations
+default   [  73% ] 11/15 VUs  32.6s/45.0s
+
+running (0m34.0s), 11/15 VUs, 375 complete and 0 interrupted iterations
+default   [  75% ] 11/15 VUs  33.6s/45.0s
+
+running (0m35.0s), 12/15 VUs, 397 complete and 0 interrupted iterations
+default   [  77% ] 12/15 VUs  34.6s/45.0s
+
+running (0m36.0s), 12/15 VUs, 417 complete and 0 interrupted iterations
+default   [  79% ] 12/15 VUs  35.6s/45.0s
+
+running (0m37.0s), 13/15 VUs, 441 complete and 0 interrupted iterations
+default   [  81% ] 13/15 VUs  36.6s/45.0s
+
+running (0m38.0s), 13/15 VUs, 465 complete and 0 interrupted iterations
+default   [  84% ] 13/15 VUs  37.6s/45.0s
+
+running (0m39.0s), 14/15 VUs, 489 complete and 0 interrupted iterations
+default   [  86% ] 14/15 VUs  38.6s/45.0s
+
+running (0m40.0s), 14/15 VUs, 515 complete and 0 interrupted iterations
+default   [  88% ] 14/15 VUs  39.6s/45.0s
+
+running (0m41.0s), 14/15 VUs, 543 complete and 0 interrupted iterations
+default   [  90% ] 14/15 VUs  40.6s/45.0s
+
+running (0m42.0s), 11/15 VUs, 571 complete and 0 interrupted iterations
+default   [  93% ] 11/15 VUs  41.6s/45.0s
+
+running (0m43.0s), 08/15 VUs, 590 complete and 0 interrupted iterations
+default   [  95% ] 08/15 VUs  42.6s/45.0s
+
+running (0m44.0s), 05/15 VUs, 604 complete and 0 interrupted iterations
+default   [  97% ] 05/15 VUs  43.6s/45.0s
+
+running (0m45.0s), 02/15 VUs, 613 complete and 0 interrupted iterations
+default   [  99% ] 02/15 VUs  44.6s/45.0s
+
+
+  █ THRESHOLDS 
+
+    http_req_duration
+    ✓ 'p(95)<500' p(95)=22.9ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 1847    40.644709/s
+    checks_succeeded...: 100.00% 1847 out of 1847
+    checks_failed......: 0.00%   0 out of 1847
+
+    ✓ setup: login status 200
+    ✓ setup: login has token
+    ✓ GET /vehicles/available 200
+    ✓ GET /me/requests 200
+    ✓ POST /routes/{routeId}/tracking 200
+
+    HTTP
+    http_req_duration..............: avg=11.23ms  min=0s       med=11.82ms  max=281.04ms p(90)=19.41ms  p(95)=22.9ms  
+      { expected_response:true }...: avg=11.23ms  min=0s       med=11.82ms  max=281.04ms p(90)=19.41ms  p(95)=22.9ms  
+    http_req_failed................: 0.00%  0 out of 1847
+    http_reqs......................: 1847   40.644709/s
+
+    EXECUTION
+    iteration_duration.............: avg=534.61ms min=519.81ms med=532.23ms max=595.12ms p(90)=544.94ms p(95)=552.53ms
+    iterations.....................: 615    13.533566/s
+    vus............................: 2      min=1         max=14
+    vus_max........................: 15     min=15        max=15
+
+    NETWORK
+    data_received..................: 19 MB  413 kB/s
+    data_sent......................: 591 kB 13 kB/s
+
+
+
+
+running (0m45.4s), 00/15 VUs, 615 complete and 0 interrupted iterations
+default ✓ [ 100% ] 00/15 VUs  45s
+
+=== docker stats (1 instancia)
+NAME                                          CPU %     MEM USAGE / LIMIT     MEM %
+sif-core-lb                                   0.00%     3.559MiB / 3.675GiB   0.09%
+observability-core-scale-1                    107.03%   184MiB / 3.675GiB     4.89%
+sif-grafana                                   0.05%     92.64MiB / 3.675GiB   2.46%
+sif-prometheus                                0.00%     106.6MiB / 3.675GiB   2.83%
+ai-report-service                             0.30%     82.89MiB / 3.675GiB   2.20%
+tracking-service-api-1                        0.07%     88.84MiB / 3.675GiB   2.36%
+notification-service-notification-service-1   1.38%     113.7MiB / 3.675GiB   3.02%
+notification-service-mailhog-1                0.00%     5.941MiB / 3.675GiB   0.16%
+core-service-app-dev-1                        101.65%   206.5MiB / 3.675GiB   5.49%
+postgres-dev                                  101.69%   75.22MiB / 3.675GiB   2.00%
+rabbitmq-dev                                  48.91%    169.6MiB / 3.675GiB   4.51%
+minio-dev                                     0.12%     140.8MiB / 3.675GiB   3.74%
+buildx_buildkit_default                       0.00%     51.01MiB / 3.675GiB   1.36%
+
