@@ -1,0 +1,62 @@
+﻿=== go test -v -coverpkg=./internal/... -coverprofile=coverage.out ./...
+?   	github.com/Frota-Facil/tracking-service/cmd/api	[no test files]
+	github.com/Frota-Facil/tracking-service/internal/handlers		coverage: 0.0% of statements
+	github.com/Frota-Facil/tracking-service/internal/messaging		coverage: 0.0% of statements
+=== RUN   TestHealthHandler
+--- PASS: TestHealthHandler (0.08s)
+=== RUN   TestMetricsHandler
+--- PASS: TestMetricsHandler (0.00s)
+=== RUN   TestCreateTracking
+--- PASS: TestCreateTracking (0.00s)
+=== RUN   TestCreateTrackingAcceptsLegacyCoordinates
+--- PASS: TestCreateTrackingAcceptsLegacyCoordinates (0.00s)
+=== RUN   TestCreateTracking_TC_TRACK_001_ZeroCoordinates
+--- PASS: TestCreateTracking_TC_TRACK_001_ZeroCoordinates (0.00s)
+=== RUN   TestCreateTracking_TC_TRACK_002_BoundaryValues
+=== RUN   TestCreateTracking_TC_TRACK_002_BoundaryValues/min_lat_-90_min_lon_-180
+=== RUN   TestCreateTracking_TC_TRACK_002_BoundaryValues/max_lat_90_min_lon_-180
+=== RUN   TestCreateTracking_TC_TRACK_002_BoundaryValues/min_lat_-90_max_lon_180
+=== RUN   TestCreateTracking_TC_TRACK_002_BoundaryValues/max_lat_90_max_lon_180
+--- PASS: TestCreateTracking_TC_TRACK_002_BoundaryValues (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_002_BoundaryValues/min_lat_-90_min_lon_-180 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_002_BoundaryValues/max_lat_90_min_lon_-180 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_002_BoundaryValues/min_lat_-90_max_lon_180 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_002_BoundaryValues/max_lat_90_max_lon_180 (0.00s)
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/latitude_above_max_91
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/latitude_below_min_-91
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/longitude_below_min_-181
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/longitude_above_max_181
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/missing_latitude
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/missing_longitude
+=== RUN   TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/malformed_json_body
+--- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/latitude_above_max_91 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/latitude_below_min_-91 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/longitude_below_min_-181 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/longitude_above_max_181 (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/missing_latitude (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/missing_longitude (0.00s)
+    --- PASS: TestCreateTracking_TC_TRACK_003_InvalidOrMissingCoordinates/malformed_json_body (0.00s)
+=== RUN   TestCreateTracking_TC_TRACK_004_PublisherFailure
+--- PASS: TestCreateTracking_TC_TRACK_004_PublisherFailure (0.00s)
+PASS
+coverage: 61.3% of statements in ./internal/...
+ok  	github.com/Frota-Facil/tracking-service/internal/server	(cached)	coverage: 61.3% of statements in ./internal/...
+
+=== go tool cover -func=coverage.out
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:31:	CreateTracking		92.6%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:81:	coordinateValue		100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:93:	validLatitude		100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:97:	validLongitude		100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:101:	validCoordinate		100.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:29:		NewRabbitMQPublisher	0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:65:		PublishTracking		0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:90:		Close			0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:103:		amqpURL			0.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:18:			New			100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:31:			healthHandler		100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:38:			requestLogger		100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:51:			writeJSON		100.0%
+total:											(statements)		61.3%
+
