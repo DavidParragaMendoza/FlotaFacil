@@ -118,7 +118,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 
 | Orden | ID Oficial (`Casos de Teste — SIF.pdf`) | Módulo | Requisito | Descripción | Estado de Auditoría |
 |---|---|---|---|---|---|
-| 1 | `TC-CORE-001` | Autenticação | `RF-01` | Login de administrador válido | Pendiente de auditoría individual |
+| 1 | `TC-CORE-001` | Autenticação | `RF-01` | Login de administrador válido | **Auditado y Aprobado (`PASS` + `100%` Mutación)** |
 | 2 | `TC-CORE-002` | Autenticação | `RF-01` | Campos de login vazios | Pendiente de auditoría individual |
 | 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | Pendiente de auditoría individual |
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
@@ -132,3 +132,59 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | Pendiente de auditoría individual |
 | 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | Pendiente de auditoría individual |
 | 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | Pendiente de auditoría individual |
+
+---
+
+## 5. Registro Detallado de Revisión Caso por Caso (Fase 1)
+
+### 1. `TC-CORE-001` — Login de administrador válido
+
+#### 1.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-001`
+- **Módulo:** Autenticação
+- **Requisito / US:** `RF-01` — Administrador e usuário se autenticam e recebem token.
+- **Endpoint y Escenario:** `POST /admin/auth` con CPF válido de 11 dígitos (`"00000000000"`) y contraseña válida (`"123456"`), más pruebas complementarias de rechazo ante credenciales inválidas (`401`).
+- **Precondiciones (PDF):** Core y seed activos; seed de administrador disponible (aislado en pruebas de componente mediante `app.inject` y mock del repositorio de usuarios con hash real `bcryptjs`).
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 205–294).
+- **Código bajo prueba:** `core-service/src/routes/auth-router.ts`, `core-service/src/contracts/users/user-login-schema.ts`, `core-service/src/contracts/auth-response-schema.ts`, `core-service/src/use-cases/authenticate-admin.ts`, `core-service/src/plugins/fastify-jwt-service.ts`.
+
+#### 1.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / ruta** usando instancia real de Fastify (`src/app.ts` + `app.inject`), validación/serialización real con Zod (`fastify-type-provider-zod`), firma/verificación real con `@fastify/jwt` y comparación real de hash con `bcryptjs`. Dependencias externas simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserAdminByCpf`) y `@/messaging/*` (RabbitMQ). *(No valida conexión real a PostgreSQL).*
+- **Categoría:** `happy path` (escenario principal del PDF) + `failure` (escenarios complementarios creados para matar mutantes de seguridad).
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia:** clase válida (CPF admin existente + contraseña correcta) y clases inválidas de dominio (CPF válido inexistente; contraseña incorrecta).
+  - **Validación de Contrato (`authResponseSchema`):** verificación de campos expuestos y no exposición de `passwordHash`.
+  - **Criterio de Cobertura de Ramas (V8) y Mutación (StrykerJS):** alcanzar `100%` de ramas y `100%` de mutation score en `src/use-cases/authenticate-admin.ts`.
+
+#### 1.3 Resultado Esperado
+- **Escenario principal (`Casos de Teste — SIF.pdf`):**
+  - `POST /admin/auth` responde `HTTP 200`.
+  - El cuerpo JSON contiene `token` JWT tipo `string` no vacío (firmado con `{ id, role: "admin" }`) y el objeto `user` con rol `admin`, sin exponer `passwordHash`.
+  - `findUserAdminByCpf("00000000000")` es invocado exactamente una vez.
+- **Escenarios de protección contra mutantes (`authenticate-admin.ts`):**
+  - Si el CPF de 11 dígitos no existe (`findUserAdminByCpf` devuelve `undefined`) o la contraseña no coincide con el hash `bcryptjs`, el endpoint responde `HTTP 401` con `{ message: "Credenciais inválidas" }` y **no emite `token`**.
+
+#### 1.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` funcional en el happy path / `MUTANTES SOBREVIVIENTES` en calidad (`66.67%` Mutation Score)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-001"`):** `1 passed | 12 skipped (13)` en `242 ms` (`responseTime: 87.24 ms`).
+  - **Cobertura V8 inicial de `src/use-cases/authenticate-admin.ts`:** `77.77% Stmts | 50% Branch | 100% Funcs | 100% Lines` (ramas de error en líneas `15–22` sin cubrir).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/authenticate-admin.ts"`):** **`66.67%` total (`80.00%` covered)** — `12` mutantes instrumentados: `8` muertos, **`2` sobrevivientes** y **`2` sin cobertura**:
+    1. `[Survived] ConditionalExpression` (`src/use-cases/authenticate-admin.ts:15:6`): `if (!foundUser)` mutado a `if (false)`.
+    2. `[NoCoverage] CallExpression` (`src/use-cases/authenticate-admin.ts:15:18`): `throw new InvalidCredentialsError()` eliminado.
+    3. `[Survived] ConditionalExpression` (`src/use-cases/authenticate-admin.ts:22:6`): `if (!isPasswordValid)` mutado a `if (false)`.
+    4. `[NoCoverage] CallExpression` (`src/use-cases/authenticate-admin.ts:22:24`): `throw new InvalidCredentialsError()` eliminado.
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** La implementación anterior de `TC-CORE-001` probaba únicamente el inicio de sesión exitoso. Si un defecto en producción eliminara la validación de existencia del administrador o la validación de contraseña en `authenticate-admin.ts`, la suite seguiría pasando en verde.
+  - **Acción correctiva:** Se añadieron **2 tests complementarios** directamente en `core-service/tests/david-core.spec.ts` bajo `TC-CORE-001` para matar los 4 mutantes críticos:
+    1. `TC-CORE-001 (mutación - admin no encontrado)`: simula `findUserAdminByCpf` retornando `undefined` y valida `HTTP 401`, `{ message: "Credenciais inválidas" }` y ausencia de `token`.
+    2. `TC-CORE-001 (mutación - contraseña incorrecta)`: simula admin existente con hash de `"123456"` enviando `"senha-incorrecta"` y valida `HTTP 401`, `{ message: "Credenciais inválidas" }` y ausencia de `token`.
+
+- **Revalidación (después de la corrección):** **`PASS` + `100.00%` Mutation Score + `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-001"`):** `3 passed | 12 skipped (15)` en `406 ms` (`responseTime`: `89.77 ms` login válido, `1.19 ms` admin no encontrado, `80.11 ms` contraseña incorrecta).
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/authenticate-admin.ts"`):** **`100.00%` total / `100.00%` covered** — `12` mutantes instrumentados, **`12` muertos**, `0` sobrevivientes, `0` sin cobertura, `0` errores (`40 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/authenticate-admin.ts`: subió de `77.77% Stmts / 50% Branch` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`39/39` tests en verde** (`5.46 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

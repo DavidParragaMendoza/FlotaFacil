@@ -244,6 +244,55 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			});
 		});
 
+		it("TC-CORE-001 (mutación - admin no encontrado): rechaza login con 401 cuando el CPF no existe", async () => {
+			vi.mocked(findUserAdminByCpf).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {
+					cpf: "00000000000",
+					password: "123456",
+				},
+			});
+
+			expect(response.statusCode).toBe(401);
+			expect(findUserAdminByCpf).toHaveBeenCalledTimes(1);
+			expect(findUserAdminByCpf).toHaveBeenCalledWith("00000000000");
+
+			const body = response.json();
+			expect(body).toEqual({
+				message: "Credenciais inválidas",
+			});
+			expect(body).not.toHaveProperty("token");
+		});
+
+		it("TC-CORE-001 (mutación - contraseña incorrecta): rechaza login con 401 cuando la contraseña no coincide", async () => {
+			const passwordHash = await bcrypt.hash("123456", 10);
+			vi.mocked(findUserAdminByCpf).mockResolvedValue(
+				makeAdminUser({ passwordHash }),
+			);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {
+					cpf: "00000000000",
+					password: "senha-incorrecta",
+				},
+			});
+
+			expect(response.statusCode).toBe(401);
+			expect(findUserAdminByCpf).toHaveBeenCalledTimes(1);
+			expect(findUserAdminByCpf).toHaveBeenCalledWith("00000000000");
+
+			const body = response.json();
+			expect(body).toEqual({
+				message: "Credenciais inválidas",
+			});
+			expect(body).not.toHaveProperty("token");
+		});
+
 		it("TC-CORE-002: Campos de login vacíos (POST /admin/auth -> 400)", async () => {
 			const response = await app.inject({
 				method: "POST",
