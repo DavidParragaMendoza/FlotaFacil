@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import {
 	afterAll,
 	beforeAll,
@@ -93,6 +94,7 @@ import {
 	updateVehicle as updateVehicleRepository,
 } from "@/domains/vehicles/db/repository";
 import { VEHICLE_STATUSES } from "@/domains/vehicles/status";
+import { authorize } from "@/hooks/authorize";
 import { createAuditLog } from "@/use-cases/audit-log-service";
 import { notifyAdminsAboutNewRequest } from "@/use-cases/notification-service";
 
@@ -417,22 +419,91 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(findUserAdminByCpf).not.toHaveBeenCalled();
 		});
 
-		it("TC-CORE-005: Acceso a rutas protegidas sin JWT (GET /vehicles y GET /admin/vehicles -> 401)", async () => {
-			const protectedRoutes = ["/vehicles", "/admin/vehicles"];
+		it.each([
+			{ url: "/vehicles", description: "ruta protegida general" },
+			{ url: "/admin/vehicles", description: "ruta protegida administrativa" },
+		])("TC-CORE-005 ($description): GET $url sin cabecera Authorization responde 401 sin consultar repositorio", async ({
+			url,
+		}) => {
+			const response = await app.inject({
+				method: "GET",
+				url,
+			});
 
-			for (const url of protectedRoutes) {
-				const response = await app.inject({
-					method: "GET",
-					url,
-				});
-
-				expect(response.statusCode).toBe(401);
-				expect(response.json()).toEqual({
-					error: "Token inválido ou expirado",
-				});
-			}
-
+			expect(response.statusCode).toBe(401);
+			expect(response.json()).toEqual({
+				error: "Token inválido ou expirado",
+			});
 			expect(fetchAllVehicles).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-005 (token malformado): rechaza Bearer inválido con 401 sin consultar repositorio", async () => {
+			const response = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: {
+					authorization: "Bearer token.invalido.malformado",
+				},
+			});
+
+			expect(response.statusCode).toBe(401);
+			expect(response.json()).toEqual({
+				error: "Token inválido ou expirado",
+			});
+			expect(fetchAllVehicles).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-005 (token expirado): rechaza JWT vencido con 401 sin consultar repositorio", async () => {
+			const expiredToken = app.jwt.sign(
+				{
+					id: ADMIN_ID,
+					role: USER_ROLES[1],
+				},
+				{ expiresIn: -10 },
+			);
+
+			const response = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: {
+					authorization: `Bearer ${expiredToken}`,
+				},
+			});
+
+			expect(response.statusCode).toBe(401);
+			expect(response.json()).toEqual({
+				error: "Token inválido ou expirado",
+			});
+			expect(fetchAllVehicles).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-005 (mutación RBAC - rol driver en /admin/vehicles): hook authorize bloquea con 403", async () => {
+			const response = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: getDriverAuthHeader(),
+			});
+
+			expect(response.statusCode).toBe(403);
+			expect(response.json()).toEqual({
+				error: "Sem permissão",
+			});
+			expect(fetchAllVehicles).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-005 (mutación RBAC - defensa sin request.user): hook authorize responde 401 Não autenticado", async () => {
+			const guard = authorize([USER_ROLES[1]]);
+			const send = vi.fn();
+			const status = vi.fn().mockReturnValue({ send });
+			const fakeRequest = {} as FastifyRequest;
+			const fakeReply = { status } as unknown as FastifyReply;
+
+			await guard(fakeRequest, fakeReply);
+
+			expect(status).toHaveBeenCalledWith(401);
+			expect(send).toHaveBeenCalledWith({
+				error: "Não autenticado",
+			});
 		});
 	});
 

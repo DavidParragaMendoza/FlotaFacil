@@ -122,7 +122,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 2 | `TC-CORE-002` | Autenticação | `RF-01` | Campos de login vazios | **Auditado y Aprobado (`PASS` + Aislamiento de Campos)** |
 | 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | **Auditado y Aprobado (`PASS` + `100%` Mutación `adminLoginSchema`)** |
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
-| 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | Pendiente de auditoría individual |
+| 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | **Auditado y Aprobado (`PASS` + `100%` Mutación Hooks)** |
 | 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | Pendiente de auditoría individual |
 | 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | Pendiente de auditoría individual |
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | Pendiente de auditoría individual |
@@ -299,4 +299,61 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/contracts/users/user-login-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`48/48` tests en verde** (`5.47 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 4. `TC-CORE-005` — Recurso protegido sin JWT (y protección RBAC)
+
+#### 4.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-005` *(Nota: no existe `TC-CORE-004` en el PDF oficial; la fila 4 corresponde a `TC-ADMIN-001` en `admin-app`/Playwright).*
+- **Módulo:** RBAC
+- **Requisito / US:** `RF-02` — RBAC diferencia `ADMIN` y `USER` en recursos `/admin/*` y exige JWT en rutas protegidas.
+- **Endpoint y Escenario:** `GET /vehicles` y `GET /admin/vehicles` sin cabecera `Authorization`, ampliado con JWT malformado, JWT expirado y protección RBAC del hook `authorize` (rol `driver` en ruta `/admin/vehicles` y ausencia de `request.user`).
+- **Precondiciones (PDF):** Core activo (instancia real de Fastify con hooks `verifyJwt` y `authorize`).
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 420–509).
+- **Código bajo prueba:** `core-service/src/hooks/verify-jwt.ts`, `core-service/src/hooks/authorize.ts`, `core-service/src/routes/vehicle-router.ts`.
+
+#### 4.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / hooks de seguridad** (`app.inject` + `@fastify/jwt` + `verifyJwt` + `authorize` reales) combinada con una prueba **unitaria directa** del guard `authorize([USER_ROLES[1]])`. Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`fetchAll`) para verificación negativa y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `failure` + `security / RBAC`.
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia de Seguridad:** sin token, token malformado, token expirado (`401`), token válido con rol insuficiente (`403`) y defensa en profundidad sin `request.user` (`401`).
+  - **Verificación Negativa de Acceso a Datos:** `fetchAllVehicles` nunca es invocado (`0` llamadas).
+  - **Cobertura de Ramas V8 y Mutación (StrykerJS):** alcanzar `100%` de cobertura y `100%` de mutation score en ambos hooks (`verify-jwt.ts` y `authorize.ts`).
+
+#### 4.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `GET /vehicles` y `GET /admin/vehicles` sin cabecera `Authorization` (así como con token inválido o expirado) responden `HTTP 401` con `{ error: "Token inválido ou expirado" }`.
+  - El recurso no es consultado ni modificado (`fetchAllVehicles` no invocado).
+- Complementario de seguridad RBAC (`RF-02` / `authorize.ts`):
+  - `GET /admin/vehicles` con JWT válido de rol `driver` responde `HTTP 403` con `{ error: "Sem permissão" }` sin consultar el repositorio.
+  - Invocar `authorize` sin `request.user` responde `HTTP 401` con `{ error: "Não autenticado" }`.
+
+#### 4.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` en `verify-jwt.ts` / `MUTANTES SOBREVIVIENTES CRÍTICOS` en `authorize.ts` (`30.77%` Mutation Score)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-005"`):** `1 passed | 23 skipped (24)` en `56 ms` (solo probaba ausencia total de header en un bucle `for`).
+  - **Cobertura V8 inicial de `src/hooks/`:** `verify-jwt.ts` al `100%`, pero `authorize.ts` al **`66.66% Stmts | 50% Branch`** (líneas `9` y `13` sin cubrir).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/hooks/verify-jwt.ts,src/hooks/authorize.ts"`):** **`50.00%` combinado** (`verify-jwt.ts`: `100.00%`, `5/5`; **`authorize.ts`: `30.77%`**, `4` muertos, **`3` sobrevivientes**, **`6` sin cobertura**, `1` error de arranque):
+    - Sobrevivía incluso vaciar el cuerpo completo del hook `authorize` (`async () => {}`, línea 5) y reemplazar `if (!allowedRoles.includes(user.role))` por `if (false)` (línea 12), además de las ramas `403` (líneas 12–13) y `401` defensivo sin `request.user` (líneas 8–9) sin cobertura.
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** Ningún test de la suite probaba rechazo por rol insuficiente (`403`) ni la rama defensiva sin `request.user` (`401`) en `authorize.ts`, ni validaba tokens malformados/expirados en `verifyJwt`.
+  - **Acción correctiva:** Se amplió `TC-CORE-005` en `core-service/tests/david-core.spec.ts` a **6 tests independientes**:
+    1. `it.each` para `GET /vehicles` y `GET /admin/vehicles` sin `Authorization` (`401`).
+    2. `GET /admin/vehicles` con `Bearer` malformado (`401`).
+    3. `GET /admin/vehicles` con JWT expirado (`expiresIn: -10`, `401`).
+    4. `GET /admin/vehicles` con JWT válido de rol `driver` (`403` `{ error: "Sem permissão" }`, mata 8 mutantes en `authorize.ts`).
+    5. Prueba unitaria de `authorize([USER_ROLES[1]])` sin `request.user` (`401` `{ error: "Não autenticado" }`, mata 4 mutantes en `authorize.ts`).
+
+- **Revalidación (después de la corrección):** **`PASS` (`6/6` tests) + `100.00%` Mutation Score y `100%` Cobertura en ambos hooks**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-005"`):** `6 passed | 23 skipped (29)` en `63 ms`.
+  - **StrykerJS (`npx.cmd stryker run -m "src/hooks/verify-jwt.ts,src/hooks/authorize.ts"`):** subió de `50.00%` a **`100.00%` total / `100.00%` covered** (`50 s`):
+    - `verify-jwt.ts`: **`100.00%`** (`5` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores).
+    - `authorize.ts`: subió de `30.77%` a **`100.00%`** (`13` muertos, `0` sobrevivientes, `0` sin cobertura; `1` mutante marcado como error de arranque de Fastify al mutar la fábrica del `preHandler`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/hooks/verify-jwt.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - `src/hooks/authorize.ts`: subió de `66.66% Stmts / 50% Branch` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`53/53` tests en verde** (`5.58 s`), cobertura global `34.65% Stmts | 25.72% Branch | 24.49% Funcs | 34.70% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
