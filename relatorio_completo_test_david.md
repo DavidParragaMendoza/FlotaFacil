@@ -124,7 +124,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
 | 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | **Auditado y Aprobado (`PASS` + `100%` Mutación Hooks)** |
 | 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | **Auditado y Aprobado (`PASS` + Paso 2 `GET` + `100%` Mutación)** |
-| 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | Pendiente de auditoría individual |
+| 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | **Auditado y Aprobado (`PASS` + `100%` Mutación Contrato)** |
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | Pendiente de auditoría individual |
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | Pendiente de auditoría individual |
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | Pendiente de auditoría individual |
@@ -416,4 +416,62 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
     - `src/use-cases/users/create-user.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - `src/use-cases/users/fetch-user-by-id.ts`: subió de `0%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`56/56` tests en verde** (`5.82 s`), cobertura global `35.21% Stmts | 26.30% Branch | 25.16% Funcs | 35.19% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 6. `TC-CORE-007` — E-mail inválido y campos obligatorios vacíos
+
+#### 6.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-007`
+- **Módulo:** Usuários
+- **Requisito / US:** `RF-01` — Validación de campos obligatorios, formato de e-mail y límites de contrato en el alta de usuarios.
+- **Endpoint y Escenario:**
+  1. `POST /admin/users` con `name`, `email` y `password` vacíos (`""`).
+  2. `POST /admin/users` con `email` en formato inválido (`"correo-invalido-sin-arroba"`).
+  - Complementado con cuerpo vacío (`{}`) y fronteras de longitud de `cpf` y `cnh` (`10` y `12` caracteres).
+- **Precondiciones (PDF):** Admin JWT.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 665–777).
+- **Código bajo prueba:** `core-service/src/contracts/users/create-user-schema.ts`, `core-service/src/routes/user-router.ts` (`POST /admin/users`).
+
+#### 6.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / validación de contrato** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` reales). Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserByEmail`, `findUserByCpf`, `insertUser`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `failure` + `special-input` + `boundary`.
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia Negativa:** campos obligatorios vacíos (`""`), ausentes (`{}`) y formato de e-mail inválido.
+  - **Análisis de Valores Límite (BVA):** fronteras `min - 1` (`10`) y `max + 1` (`12`) para `cpf` y `cnh`.
+  - **Verificación Negativa Completa:** comprobar `0` llamadas a `findUserByEmail`, `findUserByCpf`, `insertUser` y `createAuditLog`.
+  - **Análisis de Mutación (StrykerJS):** alcanzar `100%` en `src/contracts/users/create-user-schema.ts`.
+
+#### 6.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/users` responde `HTTP 400` en cada petición inválida.
+  - `body.message` identifica cada campo inválido (`name`, `email`, `password` en Paso 1; `email` en Paso 2; todos los obligatorios en `{}`; `cpf`/`cnh` en límites de longitud).
+  - Ninguna fila nueva es insertada ni auditada, ni se consultan `findUserByEmail`/`findUserByCpf`.
+
+#### 6.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Trazabilidad de Incidente Histórico (Commit `b2d6811`):**
+  - *Nota de auditoría:* Originalmente en el código base, `createUserSchema` (`src/contracts/users/create-user-schema.ts:5,7`) definía `name: z.string()` y `password: z.string()` sin `.min(1)`, permitiendo cadenas vacías `""`. El agente anterior añadió `.min(1)` en `b2d6811` sin documentar el fallo inicial; queda trazado formalmente aquí.
+- **Evaluación Inicial (antes de corregir en Fase 1):** **`PASS` parcial / `4 MUTANTES SOBREVIVIENTES` (`55.56%` en `create-user-schema.ts`)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-007"`):** `1 passed | 31 skipped (32)` en `341 ms` (`responseTime`: `18.53 ms` campos vacíos, `4.82 ms` email inválido). No verificaba `findUserByEmail`/`findUserByCpf` ni campos ausentes `{}`.
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/contracts/users/create-user-schema.ts"`):** **`55.56%` (`5/9` muertos, `4` sobrevivientes)**:
+    1. `[Survived] MethodExpression` (línea 8): `cpf: z.string().min(11).max(11)` → `.min(11).min(11)`.
+    2. `[Survived] MethodExpression` (línea 8): `cpf: z.string().min(11).max(11)` → `.max(11).max(11)`.
+    3. `[Survived] MethodExpression` (línea 9): `cnh: z.string().min(11).max(11).optional()` → `.min(11).min(11).optional()`.
+    4. `[Survived] MethodExpression` (línea 9): `cnh: z.string().min(11).max(11).optional()` → `.max(11).max(11).optional()`.
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** Ningún test de la suite probaba longitudes fuera de límite (`10` y `12` caracteres) para `cpf` ni para el campo opcional `cnh` al crear usuarios.
+  - **Acción correctiva:** En `core-service/tests/david-core.spec.ts` bajo `TC-CORE-007`:
+    1. Se añadieron assertions negativas de `findUserByEmail` y `findUserByCpf` (`not.toHaveBeenCalled()`).
+    2. Se añadió el caso `TC-CORE-007 (campos obligatorios ausentes)` enviando `{}` (`400` identificando `name`, `email`, `password`, `cpf` y `phone`).
+    3. Se añadió un bloque **`it.each` de 4 pruebas de frontera** para `cpf` (`10` y `12` chars) y `cnh` (`10` y `12` chars), matando los 4 mutantes sobrevivientes.
+
+- **Revalidación (después de la corrección):** **`PASS` (`6/6` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-007"`):** `6 passed | 31 skipped (37)` en `96 ms` (`responseTime`: `9.22 ms`, `1.13 ms`, `1.87 ms`, `0.75 ms`, `0.77 ms`, `0.83 ms`, `0.60 ms`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/contracts/users/create-user-schema.ts"`):** subió de `55.56%` (`5/9`) a **`100.00%` total / `100.00%` covered** (**`9/9` muertos**, `0` sobrevivientes, `0` sin cobertura, `0` errores; `38 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/contracts/users/create-user-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`7.48 s`), cobertura global `35.21% Stmts | 26.30% Branch | 25.16% Funcs | 35.19% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

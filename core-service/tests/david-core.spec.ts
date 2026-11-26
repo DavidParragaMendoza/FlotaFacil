@@ -701,6 +701,77 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			const invalidEmailBody = invalidEmailResponse.json();
 			expect(invalidEmailBody.message).toContain("email");
 
+			expect(findUserByEmail).not.toHaveBeenCalled();
+			expect(findUserByCpf).not.toHaveBeenCalled();
+			expect(insertUser).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-007 (campos obligatorios ausentes): rechaza {} con 400 sin tocar repositorios", async () => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/users",
+				headers: getAdminAuthHeader(),
+				payload: {},
+			});
+
+			expect(response.statusCode).toBe(400);
+			const body = response.json();
+			expect(body.message).toContain("name");
+			expect(body.message).toContain("email");
+			expect(body.message).toContain("password");
+			expect(body.message).toContain("cpf");
+			expect(body.message).toContain("phone");
+
+			expect(findUserByEmail).not.toHaveBeenCalled();
+			expect(findUserByCpf).not.toHaveBeenCalled();
+			expect(insertUser).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			{
+				label: "cpf frontera inferior (10 chars)",
+				field: "cpf",
+				overrides: { cpf: "1234567890" },
+			},
+			{
+				label: "cpf frontera superior (12 chars)",
+				field: "cpf",
+				overrides: { cpf: "123456789012" },
+			},
+			{
+				label: "cnh frontera inferior (10 chars)",
+				field: "cnh",
+				overrides: { cnh: "1234567890" },
+			},
+			{
+				label: "cnh frontera superior (12 chars)",
+				field: "cnh",
+				overrides: { cnh: "123456789012" },
+			},
+		])("TC-CORE-007 (mutación contrato - $label): rechaza con 400 identificando $field", async ({
+			field,
+			overrides,
+		}) => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/users",
+				headers: getAdminAuthHeader(),
+				payload: {
+					name: "Carlos Motorista",
+					email: "carlos@sif.com",
+					password: "driverPassword123",
+					cpf: "12345678901",
+					phone: "84999999999",
+					...overrides,
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json().message).toContain(field);
+			expect(findUserByEmail).not.toHaveBeenCalled();
+			expect(findUserByCpf).not.toHaveBeenCalled();
 			expect(insertUser).not.toHaveBeenCalled();
 			expect(createAuditLog).not.toHaveBeenCalled();
 		});
