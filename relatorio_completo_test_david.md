@@ -129,7 +129,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | **Auditado y Aprobado (`PASS` + Conteo Invariable + `100%` Mutación)** |
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | **Auditado y Aprobado (`PASS` + Aislamiento + `100%` Mutación)** |
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | **Auditado y Aprobado (`PASS` + `USER`/`ADMIN` + `100%` Mutación)** |
-| 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | Pendiente de auditoría individual |
+| 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | **Auditado y Aprobado (`PASS` + Paso 3 `GET` + `100%` Mutación)** |
 | 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | Pendiente de auditoría individual |
 | 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | Pendiente de auditoría individual |
 
@@ -683,4 +683,65 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/use-cases/vehicles/fetch-available-vehicles.ts`: subió de `73.33% / 58.33%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`75/75` tests en verde** (`10.54 s`), cobertura global `35.94% Stmts | 27.46% Branch | 26.51% Funcs | 35.77% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 11. `TC-CORE-012` — Actualizar y eliminar vehículo
+
+#### 11.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-012`
+- **Módulo:** Veículos
+- **Requisito / US:** `RF-03` — Actualización de atributos y eliminación administrativa de vehículos registrados, con auditoría y reflejo en el listado.
+- **Endpoint y Escenario:** Flujo completo de 3 pasos (`PUT /admin/vehicles/:id -> 200`, `DELETE /admin/vehicles/:id -> 204`, `GET /admin/vehicles -> 200` confirmando vehículo ausente) + escenarios de rechazo de negocio (`404 Veículo não encontrado` y `400 A placa desse veículo já foi registrada`).
+- **Precondiciones (PDF):** Vehículo registrado; Admin JWT.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 1161–1370).
+- **Código bajo prueba:** `core-service/src/use-cases/vehicles/update-vehicle.ts`, `core-service/src/use-cases/vehicles/delete-vehicle.ts`, `core-service/src/routes/vehicle-router.ts` (`PUT /admin/vehicles/:id`, `DELETE /admin/vehicles/:id`, `GET /admin/vehicles`), `core-service/src/domains/vehicles/errors.ts`.
+
+#### 11.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / flujo CRUD en memoria** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` + `setErrorHandler` reales). Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`findById`, `findByPlate`, `updateVehicle`, `deleteVehicle`, `fetchAll` respaldados por arreglo en memoria `storedVehicles`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ). *(No ejecuta `UPDATE`/`DELETE` SQL contra PostgreSQL real).*
+- **Categoría:** `happy path` (flujo de 3 pasos del PDF) + `failure` (entidad inexistente `404`, colisión de placa con otro vehículo `400`, retorno `undefined` del repositorio `404`).
+- **Criterios y Técnicas Aplicadas:**
+  - **Verificación de Flujo Completo (PDF):** validar en secuencia `PUT 200` (payload exacto enviado a `updateVehicleRepository` + auditoría `VEHICLE.UPDATED`), `DELETE 204` (auditoría `VEHICLE.DELETED`) y `GET /admin/vehicles -> 200` confirmando la ausencia del vehículo eliminado.
+  - **Partición de Equivalencia Negativa:** actualización/eliminación de ID inexistente, colisión de placa con vehículo de distinto ID y fallo defensivo cuando el repositorio retorna `undefined`.
+  - **Criterio de Cobertura de Ramas (V8) y Mutación (StrykerJS):** alcanzar `100%` de cobertura y `100%` de mutation score en `update-vehicle.ts` y `delete-vehicle.ts`.
+
+#### 11.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - **Paso 1:** `PUT /admin/vehicles/:id` responde `HTTP 200` con los datos actualizados, invoca `updateVehicleRepository` con todos los campos mapeados (incluido `imageUrl` no nulo) y llama a `createAuditLog` (`VEHICLE.UPDATED`).
+  - **Paso 2:** `DELETE /admin/vehicles/:id` responde `HTTP 204`, invoca `deleteVehicleRepository(id)` y llama a `createAuditLog` (`VEHICLE.DELETED`).
+  - **Paso 3:** `GET /admin/vehicles` responde `HTTP 200` confirmando que el vehículo eliminado ya no figura en el listado.
+  - **Escenarios de rechazo:** ID inexistente o retorno `undefined` del repositorio responde `HTTP 404` (`"Veículo não encontrado"`); placa perteneciente a otro vehículo responde `HTTP 400` (`"A placa desse veículo já foi registrada"`), sin invocar `updateVehicleRepository`, `deleteVehicleRepository` ni `createAuditLog`.
+
+#### 11.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`INCOMPLETO` frente al PDF + `MUTANTE SOBREVIVIENTE` (`57.14%` combinado)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-012"`):** `1 passed | 50 skipped (51)` en `85 ms` (`responseTime`: `15.02 ms` `PUT 200`, `0.89 ms` `DELETE 204`).
+  - **Cobertura V8 inicial:**
+    - `src/use-cases/vehicles/update-vehicle.ts`: `72.72% Stmts | 70% Branch | 100% Funcs | 72.72% Lines` (sin cubrir: `24, 30, 44`).
+    - `src/use-cases/vehicles/delete-vehicle.ts`: `71.42% Stmts | 50% Branch | 100% Funcs | 71.42% Lines` (sin cubrir: `16, 22`).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/vehicles/update-vehicle.ts,src/use-cases/vehicles/delete-vehicle.ts"`):** **`57.14%` total / `69.57%` covered** (`28` mutantes: `16` muertos, **`7` sobrevivientes**, **`5` sin cobertura**, `0` errores; `40 s`):
+    - `update-vehicle.ts`: `55.56%` (`10/18` muertos, `5` sobrevivientes, `3` sin cobertura — incluía `ObjectLiteral -> {}` en el payload de `updateVehicleRepository`, `LogicalOperator ?? -> &&` en `imageUrl` y las guardias `404`/`400`).
+    - `delete-vehicle.ts`: `60.00%` (`6/10` muertos, `2` sobrevivientes, `2` sin cobertura — guardias `if (!vehicle)` e `if (!deletedVehicle)`).
+  - **Debilidades detectadas:**
+    1. Omitía el **Paso 3 del PDF** (`GET /admin/vehicles` confirmando vehículo ausente tras la eliminación).
+    2. No verificaba los argumentos exactos pasados a `updateVehicleRepository` (permitiendo que mutantes vaciaran el objeto de actualización o corrompieran `imageUrl ?? null`).
+    3. No cubría las rutas de error `404` y `400` en `update-vehicle.ts` y `delete-vehicle.ts`.
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se amplió `TC-CORE-012` en `core-service/tests/david-core.spec.ts` (de `1` a **`6` pruebas**):
+    1. En el flujo principal se conectaron los mocks sobre un estado en memoria `storedVehicles`, se agregó verificación estricta de `findVehicleById`, `findByPlate` y `updateVehicleRepository(VEHICLE_ID, { ... imageUrl: "https://cdn.sif.local/vehicles/toro-ultra.png" ... })`, y se completó el **Paso 3 (`GET /admin/vehicles -> 200`, `[]`)**.
+    2. Se añadieron **3 pruebas de mutación para `PUT`**: vehículo no encontrado (`404`), placa perteneciente a otro vehículo (`400`) y repositorio retornando `undefined` (`404`).
+    3. Se añadieron **2 pruebas de mutación para `DELETE`**: vehículo no encontrado (`404`) y repositorio retornando `undefined` (`404`).
+
+- **Revalidación (después de la corrección):** **`PASS` (`6/6` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-012"`):** `6 passed | 50 skipped (56)` en `112 ms`.
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/vehicles/update-vehicle.ts,src/use-cases/vehicles/delete-vehicle.ts"`):** subió de `57.14%` a **`100.00%` total / `100.00%` covered** (`28/28` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores; `50 s`):
+    - `update-vehicle.ts`: subió de `55.56%` a **`100.00%`** (`18/18` muertos).
+    - `delete-vehicle.ts`: subió de `60.00%` a **`100.00%`** (`10/10` muertos).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/vehicles/update-vehicle.ts`: subió de `72.72% / 70%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - `src/use-cases/vehicles/delete-vehicle.ts`: subió de `71.42% / 50%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - **Directorio completo `src/use-cases/vehicles/`:** **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`80/80` tests en verde** (`5.94 s`), cobertura global `36.34% Stmts | 28.43% Branch | 26.51% Funcs | 36.18% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

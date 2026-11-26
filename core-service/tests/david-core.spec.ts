@@ -1158,18 +1158,110 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(fetchAllAvailable).not.toHaveBeenCalled();
 		});
 
-		it("TC-CORE-012: Actualizar (PUT /admin/vehicles/:id -> 200) y eliminar vehículo (DELETE -> 204)", async () => {
-			// Paso 1: Actualizar vehículo (PUT /admin/vehicles/:id -> 200)
-			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
-			vi.mocked(findByPlate).mockResolvedValue(makeVehicle());
-			vi.mocked(updateVehicleRepository).mockResolvedValue(
-				makeVehicle({
-					model: "Fiat Toro Ultra",
-					odometer: 2500,
-				}),
+		it("TC-CORE-012: Actualizar (PUT /admin/vehicles/:id -> 200), eliminar (DELETE -> 204) y confirmar ausencia en GET /admin/vehicles", async () => {
+			const storedVehicles = [makeVehicle()];
+			vi.mocked(fetchAllVehicles).mockImplementation(async () => [
+				...storedVehicles,
+			]);
+			vi.mocked(findVehicleById).mockImplementation(async (id) =>
+				storedVehicles.find((vehicle) => vehicle.id === id),
 			);
+			vi.mocked(findByPlate).mockImplementation(async (plate) =>
+				storedVehicles.find((vehicle) => vehicle.plate === plate),
+			);
+			vi.mocked(updateVehicleRepository).mockImplementation(
+				async (id, data) => {
+					const index = storedVehicles.findIndex(
+						(vehicle) => vehicle.id === id,
+					);
+					if (index === -1) return undefined;
+					const updated = makeVehicle({
+						...storedVehicles[index],
+						...data,
+						id,
+					});
+					storedVehicles[index] = updated;
+					return updated;
+				},
+			);
+			vi.mocked(deleteVehicleRepository).mockImplementation(async (id) => {
+				const index = storedVehicles.findIndex((vehicle) => vehicle.id === id);
+				if (index === -1) return undefined;
+				const [removed] = storedVehicles.splice(index, 1);
+				return removed;
+			});
 
+			// Paso 1: Actualizar vehículo (PUT /admin/vehicles/:id -> 200)
 			const putResponse = await app.inject({
+				method: "PUT",
+				url: `/admin/vehicles/${VEHICLE_ID}`,
+				headers: getAdminAuthHeader(),
+				payload: {
+					plate: "ABC1D23",
+					model: "Fiat Toro Ultra",
+					year: 2024,
+					odometer: 2500,
+					imageUrl: "https://cdn.sif.local/vehicles/toro-ultra.png",
+					status: "AVAILABLE",
+					type: "CAR",
+				},
+			});
+
+			expect(putResponse.statusCode).toBe(200);
+			expect(findVehicleById).toHaveBeenCalledWith(VEHICLE_ID);
+			expect(findByPlate).toHaveBeenCalledWith("ABC1D23");
+			expect(updateVehicleRepository).toHaveBeenCalledWith(VEHICLE_ID, {
+				plate: "ABC1D23",
+				model: "Fiat Toro Ultra",
+				year: 2024,
+				odometer: 2500,
+				imageUrl: "https://cdn.sif.local/vehicles/toro-ultra.png",
+				status: "AVAILABLE",
+				type: "CAR",
+			});
+			expect(putResponse.json()).toMatchObject({
+				id: VEHICLE_ID,
+				plate: "ABC1D23",
+				model: "Fiat Toro Ultra",
+				odometer: 2500,
+				imageUrl: "https://cdn.sif.local/vehicles/toro-ultra.png",
+			});
+			expect(createAuditLog).toHaveBeenCalledWith({
+				action: "VEHICLE.UPDATED",
+				entityId: VEHICLE_ID,
+				performedBy: ADMIN_ID,
+			});
+
+			// Paso 2: Eliminar vehículo (DELETE /admin/vehicles/:id -> 204)
+			const deleteResponse = await app.inject({
+				method: "DELETE",
+				url: `/admin/vehicles/${VEHICLE_ID}`,
+				headers: getAdminAuthHeader(),
+			});
+
+			expect(deleteResponse.statusCode).toBe(204);
+			expect(deleteVehicleRepository).toHaveBeenCalledWith(VEHICLE_ID);
+			expect(createAuditLog).toHaveBeenCalledWith({
+				action: "VEHICLE.DELETED",
+				entityId: VEHICLE_ID,
+				performedBy: ADMIN_ID,
+			});
+
+			// Paso 3 (PDF): Confirmar ausencia en el listado administrativo (GET /admin/vehicles -> 200)
+			const listResponse = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: getAdminAuthHeader(),
+			});
+
+			expect(listResponse.statusCode).toBe(200);
+			expect(listResponse.json()).toEqual([]);
+		});
+
+		it("TC-CORE-012 (mutación PUT - vehículo no encontrado): responde 404 sin consultar placa ni actualizar", async () => {
+			vi.mocked(findVehicleById).mockResolvedValue(undefined);
+
+			const response = await app.inject({
 				method: "PUT",
 				url: `/admin/vehicles/${VEHICLE_ID}`,
 				headers: getAdminAuthHeader(),
@@ -1184,35 +1276,97 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				},
 			});
 
-			expect(putResponse.statusCode).toBe(200);
-			expect(putResponse.json()).toMatchObject({
-				id: VEHICLE_ID,
-				plate: "ABC1D23",
-				model: "Fiat Toro Ultra",
-				odometer: 2500,
-			});
-			expect(createAuditLog).toHaveBeenCalledWith({
-				action: "VEHICLE.UPDATED",
-				entityId: VEHICLE_ID,
-				performedBy: ADMIN_ID,
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Veículo não encontrado" });
+			expect(findByPlate).not.toHaveBeenCalled();
+			expect(updateVehicleRepository).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-012 (mutación PUT - placa pertenece a otro vehículo): responde 400 sin actualizar ni auditar", async () => {
+			vi.mocked(findVehicleById).mockResolvedValue(
+				makeVehicle({ id: VEHICLE_ID, plate: "ABC1D23" }),
+			);
+			vi.mocked(findByPlate).mockResolvedValue(
+				makeVehicle({ id: BUSY_VEHICLE_ID, plate: "XYZ9K88" }),
+			);
+
+			const response = await app.inject({
+				method: "PUT",
+				url: `/admin/vehicles/${VEHICLE_ID}`,
+				headers: getAdminAuthHeader(),
+				payload: {
+					plate: "XYZ9K88",
+					model: "Fiat Toro Ultra",
+					year: 2024,
+					odometer: 2500,
+					imageUrl: null,
+					status: "AVAILABLE",
+					type: "CAR",
+				},
 			});
 
-			// Paso 2: Eliminar vehículo (DELETE /admin/vehicles/:id -> 204)
-			vi.mocked(deleteVehicleRepository).mockResolvedValue(makeVehicle());
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message: "A placa desse veículo já foi registrada",
+			});
+			expect(updateVehicleRepository).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
 
-			const deleteResponse = await app.inject({
+		it("TC-CORE-012 (mutación PUT - repositorio retorna undefined): responde 404 sin auditar", async () => {
+			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
+			vi.mocked(findByPlate).mockResolvedValue(makeVehicle());
+			vi.mocked(updateVehicleRepository).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "PUT",
+				url: `/admin/vehicles/${VEHICLE_ID}`,
+				headers: getAdminAuthHeader(),
+				payload: {
+					plate: "ABC1D23",
+					model: "Fiat Toro Ultra",
+					year: 2024,
+					odometer: 2500,
+					imageUrl: null,
+					status: "AVAILABLE",
+					type: "CAR",
+				},
+			});
+
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Veículo não encontrado" });
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-012 (mutación DELETE - vehículo no encontrado): responde 404 sin eliminar ni auditar", async () => {
+			vi.mocked(findVehicleById).mockResolvedValue(undefined);
+
+			const response = await app.inject({
 				method: "DELETE",
 				url: `/admin/vehicles/${VEHICLE_ID}`,
 				headers: getAdminAuthHeader(),
 			});
 
-			expect(deleteResponse.statusCode).toBe(204);
-			expect(deleteVehicleRepository).toHaveBeenCalledWith(VEHICLE_ID);
-			expect(createAuditLog).toHaveBeenCalledWith({
-				action: "VEHICLE.DELETED",
-				entityId: VEHICLE_ID,
-				performedBy: ADMIN_ID,
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Veículo não encontrado" });
+			expect(deleteVehicleRepository).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-012 (mutación DELETE - repositorio retorna undefined): responde 404 sin auditar", async () => {
+			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
+			vi.mocked(deleteVehicleRepository).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "DELETE",
+				url: `/admin/vehicles/${VEHICLE_ID}`,
+				headers: getAdminAuthHeader(),
 			});
+
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Veículo não encontrado" });
+			expect(createAuditLog).not.toHaveBeenCalled();
 		});
 	});
 
