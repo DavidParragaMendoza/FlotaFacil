@@ -131,7 +131,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | **Auditado y Aprobado (`PASS` + `USER`/`ADMIN` + `100%` Mutación)** |
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | **Auditado y Aprobado (`PASS` + Paso 3 `GET` + `100%` Mutación)** |
 | 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | **Auditado y Aprobado (`PASS` + `approvedBy: null` + `100%` Mutación)** |
-| 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | Pendiente de auditoría individual |
+| 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | **Auditado y Aprobado (`PASS` + Aislamiento + `100%` Mutación Contrato)** |
 
 ---
 
@@ -798,4 +798,56 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/use-cases/requests/create-my-request.ts`: subió de `65% / 50%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`89/89` tests en verde** (`6.23 s`), cobertura global `36.91% Stmts | 29.98% Branch | 26.51% Funcs | 36.75% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 13. `TC-CORE-014` — Campos obligatorios vacíos en solicitud
+
+#### 13.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-014`
+- **Módulo:** Solicitações
+- **Requisito / US:** `RF-04` — Validación obligatoria de campos (`vehicleId` UUID válido, `destination` y `reason` no vacíos) y del intervalo de fechas (`predictedEndDate > predictedStartDate`) en el contrato de creación de solicitudes.
+- **Endpoint y Escenario:** `POST /me/requests` con `USER JWT` y payload con campos obligatorios vacíos/ausentes (escenario combinado del PDF + aislamiento individual por campo, UUID malformado, `{}` y fronteras de intervalo `end === start` / `end < start` validadas por Zod).
+- **Precondiciones (PDF):** `USER JWT` válido.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 1647–1784).
+- **Código bajo prueba:** `core-service/src/contracts/requests/create-my-request-schema.ts`, `core-service/src/routes/request-router.ts` (`POST /me/requests`).
+
+#### 13.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / validación de contrato** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` reales). Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserById`), `@/domains/vehicles/db/repository` (`findById`), `@/domains/requests/db/repository` (`insertRequestWithScheduleChecks`), `@/use-cases/audit-log-service` (`createAuditLog`), `@/use-cases/notification-service` (`notifyAdminsAboutNewRequest`) y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `failure` + `boundary` (`end === start`, `end < start`) + `special-input` (UUID malformado, payload vacío `{}`).
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia Negativa y Aislamiento de Variables:** escenario combinado del PDF más `it.each` de 5 casos aislados (`vehicleId` ausente, UUID malformado `"nao-e-um-uuid"`, `destination: ""`, `reason: ""`, `{}`).
+  - **Análisis de Valor Límite y Mutación de Contrato (`.refine`):** 2 casos HTTP (`end === start` y `end < start`) verificando que el error provenga de la validación Zod (identificando simultáneamente la ruta `predictedEndDate` y el mensaje `"A data final deve ser maior que a data inicial"`).
+  - **Verificación Negativa Total:** confirmar `0` llamadas a `findUserById`, `findVehicleById`, `insertRequestWithScheduleChecks`, `createAuditLog` y `notifyAdminsAboutNewRequest`.
+
+#### 13.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /me/requests` responde `HTTP 400` en el escenario combinado y en cada escenario aislado.
+  - `body.message` identifica el/los campo(s) inválido(s) (`vehicleId`, `destination`, `reason`, `predictedEndDate`) y el mensaje exacto del `.refine` cuando el intervalo de fechas es inválido.
+  - La solicitud **no se crea** ni se consultan repositorios (`findUserById`, `findVehicleById`, `insertRequestWithScheduleChecks`, `createAuditLog` y `notifyAdminsAboutNewRequest` con `0` llamadas).
+
+#### 13.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` parcial / `MUTANTE SOBREVIVIENTE` (`50.00%` en `.refine`) y falta de aislamiento**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-014"`):** `1 passed | 64 skipped (65)` en `83 ms` (`responseTime: 9.10 ms`).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/contracts/requests/create-my-request-schema.ts"`):** **`50.00%` total / `50.00%` covered** (`12` mutantes: `6` muertos, **`6` sobrevivientes**, `0` sin cobertura, `0` errores; `29 s`).
+    - Los `6` mutantes sobrevivientes estaban concentrados en el `.refine` de fechas (líneas 11–14): `>` → `>=`, predicado → `true`, objeto de opciones → `{}`, `message` → `""`, `path: ["predictedEndDate"]` → `[""]` y `[]`.
+  - **Debilidades detectadas:**
+    1. Agrupaba los 3 campos inválidos únicamente en una petición, sin aislar cada campo, UUID malformado ni `{}`.
+    2. No comprobaba `0` invocaciones de `findUserById` y `findVehicleById`.
+    3. No ejercitaba por HTTP el `.refine` de fechas en `createMyRequestSchema`.
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se amplió `TC-CORE-014` en `core-service/tests/david-core.spec.ts` (de `1` a **`8` pruebas**):
+    1. Se añadieron `expect(findUserById).not.toHaveBeenCalled()` y `expect(findVehicleById).not.toHaveBeenCalled()` en la prueba combinada del PDF.
+    2. Se añadió bloque `it.each` con **5 casos aislados**: `vehicleId` ausente, `vehicleId` UUID malformado (`"nao-e-um-uuid"`), `destination: ""`, `reason: ""` y `{}`.
+    3. Se añadió bloque `it.each` con **2 casos HTTP de frontera de fechas** (`end === start` y `end < start`) validando `HTTP 400`, presencia simultánea de `"predictedEndDate"` y `"A data final deve ser maior que a data inicial"` en `body.message`, y `0` llamadas a todos los mocks (matando los `6` mutantes del `.refine`).
+
+- **Revalidación (después de la corrección):** **`PASS` (`8/8` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-014"`):** `8 passed | 64 skipped (72)` en `117 ms`.
+  - **StrykerJS (`npx.cmd stryker run -m "src/contracts/requests/create-my-request-schema.ts"`):** subió de `50.00%` a **`100.00%` total / `100.00%` covered** (`12/12` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores; `27 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/contracts/requests/create-my-request-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`96/96` tests en verde** (`5.95 s`), cobertura global `36.91% Stmts | 29.98% Branch | 26.51% Funcs | 36.75% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

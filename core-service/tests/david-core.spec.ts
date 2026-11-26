@@ -1663,6 +1663,121 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(body.message).toContain("destination");
 			expect(body.message).toContain("reason");
 
+			expect(findUserById).not.toHaveBeenCalled();
+			expect(findVehicleById).not.toHaveBeenCalled();
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			{
+				label: "vehicleId ausente",
+				expectedFields: ["vehicleId"],
+				payload: {
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica",
+				},
+			},
+			{
+				label: "vehicleId UUID malformado",
+				expectedFields: ["vehicleId"],
+				payload: {
+					vehicleId: "nao-e-um-uuid",
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica",
+				},
+			},
+			{
+				label: "destination vacío",
+				expectedFields: ["destination"],
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "",
+					reason: "Visita técnica",
+				},
+			},
+			{
+				label: "reason vacío",
+				expectedFields: ["reason"],
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "",
+				},
+			},
+			{
+				label: "payload vacío {}",
+				expectedFields: ["vehicleId", "destination", "reason"],
+				payload: {},
+			},
+		])("TC-CORE-014 (aislamiento - $label): rechaza con 400 sin consultar repositorios", async ({
+			expectedFields,
+			payload,
+		}) => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload,
+			});
+
+			expect(response.statusCode).toBe(400);
+			const body = response.json();
+			for (const field of expectedFields) {
+				expect(body.message).toContain(field);
+			}
+			expect(findUserById).not.toHaveBeenCalled();
+			expect(findVehicleById).not.toHaveBeenCalled();
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			{
+				label: "fecha final igual a la inicial",
+				predictedStartDate: "2026-03-15T12:00:00.000Z",
+				predictedEndDate: "2026-03-15T12:00:00.000Z",
+			},
+			{
+				label: "fecha final anterior a la inicial",
+				predictedStartDate: "2026-03-15T12:00:00.000Z",
+				predictedEndDate: "2026-03-15T08:00:00.000Z",
+			},
+		])("TC-CORE-014 (mutación contrato refine - $label): rechaza en Zod con 400 identificando predictedEndDate", async ({
+			predictedStartDate,
+			predictedEndDate,
+		}) => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate,
+					predictedEndDate,
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			const body = response.json();
+			expect(body.message).toContain("predictedEndDate");
+			expect(body.message).toContain(
+				"A data final deve ser maior que a data inicial",
+			);
+			expect(findUserById).not.toHaveBeenCalled();
+			expect(findVehicleById).not.toHaveBeenCalled();
 			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
 			expect(createAuditLog).not.toHaveBeenCalled();
 			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
