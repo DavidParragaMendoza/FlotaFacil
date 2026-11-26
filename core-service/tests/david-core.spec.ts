@@ -778,10 +778,22 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 	});
 
 	describe("3. Gestión de Vehículos", () => {
-		it("TC-CORE-008: Registrar vehículo válido (POST /admin/vehicles -> 201)", async () => {
+		it("TC-CORE-008: Registrar vehículo válido (POST /admin/vehicles -> 201 y visible en GET /admin/vehicles -> 200)", async () => {
+			const storedVehicles: ReturnType<typeof makeVehicle>[] = [];
 			vi.mocked(findByPlate).mockResolvedValue(undefined);
-			vi.mocked(insertVehicle).mockResolvedValue(makeVehicle());
+			vi.mocked(insertVehicle).mockImplementation(async (data) => {
+				const created = makeVehicle({
+					...data,
+					imageUrl: data.imageUrl ?? null,
+				});
+				storedVehicles.push(created);
+				return created;
+			});
+			vi.mocked(fetchAllVehicles).mockImplementation(
+				async () => storedVehicles,
+			);
 
+			// Paso 1: POST /admin/vehicles
 			const response = await app.inject({
 				method: "POST",
 				url: "/admin/vehicles",
@@ -825,6 +837,28 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				action: "VEHICLE.CREATED",
 				entityId: VEHICLE_ID,
 				performedBy: ADMIN_ID,
+			});
+
+			// Verificación exigida en PDF: visible en GET /admin/vehicles
+			const listResponse = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: getAdminAuthHeader(),
+			});
+
+			expect(listResponse.statusCode).toBe(200);
+			expect(fetchAllVehicles).toHaveBeenCalledTimes(1);
+			const listBody = listResponse.json();
+			expect(listBody).toHaveLength(1);
+			expect(listBody[0]).toMatchObject({
+				id: VEHICLE_ID,
+				plate: "ABC1D23",
+				model: "Fiat Toro",
+				year: 2024,
+				odometer: 1200,
+				imageUrl: null,
+				status: "AVAILABLE",
+				type: "CAR",
 			});
 		});
 

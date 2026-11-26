@@ -17,6 +17,7 @@ export default {
 		"src/use-cases/users/create-user.ts",
 		"src/use-cases/users/fetch-user-by-id.ts",
 		"src/use-cases/vehicles/register-vehicle.ts",
+		"src/use-cases/vehicles/fetch-vehicles.ts",
 		"src/use-cases/vehicles/fetch-available-vehicles.ts",
 		"src/use-cases/vehicles/update-vehicle.ts",
 		"src/use-cases/vehicles/delete-vehicle.ts",

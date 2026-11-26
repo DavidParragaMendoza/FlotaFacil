@@ -125,7 +125,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | **Auditado y Aprobado (`PASS` + `100%` Mutación Hooks)** |
 | 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | **Auditado y Aprobado (`PASS` + Paso 2 `GET` + `100%` Mutación)** |
 | 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | **Auditado y Aprobado (`PASS` + `100%` Mutación Contrato)** |
-| 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | Pendiente de auditoría individual |
+| 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | **Auditado y Aprobado (`PASS` + `GET /admin/vehicles` + `100%` Mutación)** |
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | Pendiente de auditoría individual |
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | Pendiente de auditoría individual |
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | Pendiente de auditoría individual |
@@ -474,4 +474,57 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/contracts/users/create-user-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`7.48 s`), cobertura global `35.21% Stmts | 26.30% Branch | 25.16% Funcs | 35.19% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 7. `TC-CORE-008` — Registrar vehículo válido
+
+#### 7.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-008`
+- **Módulo:** Veículos
+- **Requisito / US:** `RF-03` — O veículo tem placa, modelo, ano, odómetro, status e tipo; placa duplicada é rejeitada.
+- **Endpoint y Escenario:** `POST /admin/vehicles` con datos válidos (`plate: "ABC1D23"`, `model: "Fiat Toro"`, `year: 2024`, `odometer: 1200`, `imageUrl: null`, `status: "AVAILABLE"`, `type: "CAR"`), seguido de verificación de visibilidad en `GET /admin/vehicles`.
+- **Precondiciones (PDF):** Admin JWT; placa libre.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 781–863).
+- **Código bajo prueba:** `core-service/src/routes/vehicle-router.ts` (`POST /admin/vehicles`, `GET /admin/vehicles`), `core-service/src/use-cases/vehicles/register-vehicle.ts`, `core-service/src/use-cases/vehicles/fetch-vehicles.ts`.
+
+#### 7.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` reales). Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`findByPlate`, `insertVehicle`, `fetchAll`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ). *(La visibilidad entre `POST` y `GET` se enlaza mediante un arreglo en memoria del test, no contra PostgreSQL real).*
+- **Categoría:** `happy path`.
+- **Criterios y Técnicas Aplicadas:**
+  - **Validación de Contrato (`vehicleRequestSchema` / `vehicleResponseSchema`):** verificación exacta de tipos y propiedades en entrada y salida.
+  - **Verificación de Flujo Completo (`POST` → `GET /admin/vehicles`):** cumplimiento del resultado esperado de `Casos de Teste — SIF.pdf` (*"veículo persistido e visível em GET `/admin/vehicles`"*).
+  - **Cobertura V8 y Mutación (StrykerJS):** alcanzar `100%` en `register-vehicle.ts` y `fetch-vehicles.ts` (incorporando `fetch-vehicles.ts` a `core-service/stryker.config.mjs`).
+
+#### 7.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/vehicles` responde `HTTP 201` con los datos del vehículo creado y su `id`; invoca `findByPlate("ABC1D23")`, `insertVehicle(...)` y `createAuditLog` (`VEHICLE.CREATED`).
+  - `GET /admin/vehicles` responde `HTTP 200` incluyendo el vehículo recién registrado en el listado.
+
+#### 7.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`INCOMPLETO` frente al PDF + `fetch-vehicles.ts` sin cobertura (`0.00%` Mutación)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-008"`):** `1 passed | 36 skipped (37)` en `84 ms` (`responseTime: 13.16 ms`), pero **omitía la comprobación en `GET /admin/vehicles`**.
+  - **Cobertura V8 inicial:** `register-vehicle.ts` al `100%`, pero **`fetch-vehicles.ts` al `0% Stmts | 0% Funcs | 0% Lines`**.
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/vehicles/register-vehicle.ts,src/use-cases/vehicles/fetch-vehicles.ts"`):** **`75.00%` combinado (`6/8` muertos, `2` sin cobertura)**:
+    - `register-vehicle.ts`: `100.00%` (`6/6`).
+    - `fetch-vehicles.ts`: **`0.00%`** (`0/2`, ambos mutantes en `BlockStatement` y `ArrowFunction` sin cobertura).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** El test previo no verificaba la visibilidad del vehículo en `GET /admin/vehicles`, dejando incumplida parte del resultado esperado del PDF y sin cobertura el caso de uso `fetchVehicles()`.
+  - **Acción correctiva:**
+    1. Se amplió `TC-CORE-008` en `core-service/tests/david-core.spec.ts` enlazando `insertVehicle` con un arreglo `storedVehicles` retornado por `fetchAllVehicles` y ejecutando `GET /admin/vehicles` (`HTTP 200`, `length: 1`, atributos exactos del vehículo registrado).
+    2. Se añadió `src/use-cases/vehicles/fetch-vehicles.ts` a la lista `mutate` de `core-service/stryker.config.mjs`.
+
+- **Revalidación (después de la corrección):** **`PASS` + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-008"`):** `1 passed | 36 skipped (37)` en `95 ms` (`responseTime`: `12.29 ms` `POST 201`, `1.07 ms` `GET 200`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/vehicles/register-vehicle.ts,src/use-cases/vehicles/fetch-vehicles.ts"`):** subió de `75.00%` a **`100.00%` total / `100.00%` covered** (`20 s`):
+    - `register-vehicle.ts`: **`100.00%`** (`6/6` muertos).
+    - `fetch-vehicles.ts`: subió de `0.00%` a **`100.00%`** (`2/2` muertos, `0` sobrevivientes, `0` sin cobertura).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/vehicles/register-vehicle.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - `src/use-cases/vehicles/fetch-vehicles.ts`: subió de `0%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - `src/routes/vehicle-router.ts`: subió de `80.95%` a **`90.47%`**.
+    - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`5.59 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
