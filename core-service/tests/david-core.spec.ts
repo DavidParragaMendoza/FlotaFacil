@@ -86,6 +86,7 @@ import {
 } from "@/domains/users/db/repository";
 import {
 	deleteVehicle as deleteVehicleRepository,
+	fetchAllAvailable,
 	fetchAllRequestableForSchedule,
 	fetchAll as fetchAllVehicles,
 	findByPlate,
@@ -97,6 +98,7 @@ import { VEHICLE_STATUSES } from "@/domains/vehicles/status";
 import { authorize } from "@/hooks/authorize";
 import { createAuditLog } from "@/use-cases/audit-log-service";
 import { notifyAdminsAboutNewRequest } from "@/use-cases/notification-service";
+import { fetchAvailableVehicles } from "@/use-cases/vehicles/fetch-available-vehicles";
 
 const ADMIN_ID = "11111111-1111-4111-8111-111111111111";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
@@ -988,7 +990,14 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(createAuditLog).not.toHaveBeenCalled();
 		});
 
-		it("TC-CORE-011: Listado de vehículos disponibles por fecha (GET /vehicles/available -> 200)", async () => {
+		it.each([
+			{ roleLabel: "driver (USER JWT)", getHeaders: getDriverAuthHeader },
+			{ roleLabel: "admin (ADMIN JWT)", getHeaders: getAdminAuthHeader },
+		])("TC-CORE-011 ($roleLabel): Listado de vehículos disponibles por fecha (GET /vehicles/available -> 200)", async ({
+			getHeaders,
+		}) => {
+			const startDate = "2026-03-10T08:00:00.000Z";
+			const endDate = "2026-03-10T18:00:00.000Z";
 			const freeVehicle = makeVehicle({
 				id: VEHICLE_ID,
 				plate: "ABC1D23",
@@ -1013,13 +1022,25 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 
 			const response = await app.inject({
 				method: "GET",
-				url: "/vehicles/available?predictedStartDate=2026-03-10T08:00:00.000Z&predictedEndDate=2026-03-10T18:00:00.000Z",
-				headers: getDriverAuthHeader(),
+				url: `/vehicles/available?predictedStartDate=${startDate}&predictedEndDate=${endDate}`,
+				headers: getHeaders(),
 			});
 
 			expect(response.statusCode).toBe(200);
 			expect(fetchAllRequestableForSchedule).toHaveBeenCalledTimes(1);
 			expect(findVehicleScheduleConflict).toHaveBeenCalledTimes(2);
+			expect(findVehicleScheduleConflict).toHaveBeenCalledWith({
+				vehicleId: VEHICLE_ID,
+				predictedStartDate: new Date(startDate),
+				predictedEndDate: new Date(endDate),
+				ignoredRequestId: undefined,
+			});
+			expect(findVehicleScheduleConflict).toHaveBeenCalledWith({
+				vehicleId: BUSY_VEHICLE_ID,
+				predictedStartDate: new Date(startDate),
+				predictedEndDate: new Date(endDate),
+				ignoredRequestId: undefined,
+			});
 
 			const body = response.json();
 			expect(body).toHaveLength(1);
@@ -1029,6 +1050,112 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				model: "Fiat Toro",
 				status: "AVAILABLE",
 			});
+		});
+
+		it.each([
+			{
+				label: "fecha final igual a la inicial",
+				query:
+					"predictedStartDate=2026-03-10T18:00:00.000Z&predictedEndDate=2026-03-10T18:00:00.000Z",
+			},
+			{
+				label: "fecha final anterior a la inicial",
+				query:
+					"predictedStartDate=2026-03-10T18:00:00.000Z&predictedEndDate=2026-03-10T08:00:00.000Z",
+			},
+			{
+				label: "solo fecha inicial sin fecha final",
+				query: "predictedStartDate=2026-03-10T08:00:00.000Z",
+			},
+		])("TC-CORE-011 (regla de intervalo - $label): GET /vehicles/available rechaza con 400", async ({
+			query,
+		}) => {
+			const response = await app.inject({
+				method: "GET",
+				url: `/vehicles/available?${query}`,
+				headers: getDriverAuthHeader(),
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(fetchAllRequestableForSchedule).not.toHaveBeenCalled();
+			expect(findVehicleScheduleConflict).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-011 (mutación - sin fechas en query): retorna vehículos disponibles vía fetchAllAvailable", async () => {
+			vi.mocked(fetchAllAvailable).mockResolvedValue([makeVehicle()]);
+
+			const response = await app.inject({
+				method: "GET",
+				url: "/vehicles/available",
+				headers: getDriverAuthHeader(),
+			});
+
+			expect(response.statusCode).toBe(200);
+			expect(fetchAllAvailable).toHaveBeenCalledTimes(1);
+			expect(fetchAllRequestableForSchedule).not.toHaveBeenCalled();
+			expect(response.json()).toHaveLength(1);
+			expect(response.json()[0]).toMatchObject({
+				id: VEHICLE_ID,
+				plate: "ABC1D23",
+			});
+		});
+
+		it("TC-CORE-011 (mutación - filtro solo por date=YYYY-MM-DD): consulta fetchAllRequestableForSchedule", async () => {
+			vi.mocked(fetchAllRequestableForSchedule).mockResolvedValue([
+				makeVehicle(),
+			]);
+
+			const response = await app.inject({
+				method: "GET",
+				url: "/vehicles/available?date=2026-03-10",
+				headers: getDriverAuthHeader(),
+			});
+
+			expect(response.statusCode).toBe(200);
+			expect(fetchAllRequestableForSchedule).toHaveBeenCalledTimes(1);
+			expect(fetchAllAvailable).not.toHaveBeenCalled();
+			expect(response.json()).toHaveLength(1);
+			expect(response.json()[0]).toMatchObject({
+				id: VEHICLE_ID,
+				plate: "ABC1D23",
+			});
+		});
+
+		it.each([
+			{
+				label: "solo predictedStartDate sin predictedEndDate",
+				input: {
+					predictedStartDate: new Date("2026-03-10T08:00:00.000Z"),
+				},
+			},
+			{
+				label: "solo predictedEndDate sin predictedStartDate",
+				input: {
+					predictedEndDate: new Date("2026-03-10T18:00:00.000Z"),
+				},
+			},
+			{
+				label: "predictedEndDate igual a predictedStartDate",
+				input: {
+					predictedStartDate: new Date("2026-03-10T18:00:00.000Z"),
+					predictedEndDate: new Date("2026-03-10T18:00:00.000Z"),
+				},
+			},
+			{
+				label: "predictedEndDate anterior a predictedStartDate",
+				input: {
+					predictedStartDate: new Date("2026-03-10T18:00:00.000Z"),
+					predictedEndDate: new Date("2026-03-10T08:00:00.000Z"),
+				},
+			},
+		])("TC-CORE-011 (mutación defensiva caso de uso - $label): fetchAvailableVehicles lanza InvalidRequestPeriodError", async ({
+			input,
+		}) => {
+			await expect(fetchAvailableVehicles(input)).rejects.toThrow(
+				"A data final deve ser maior que a data inicial",
+			);
+			expect(fetchAllRequestableForSchedule).not.toHaveBeenCalled();
+			expect(fetchAllAvailable).not.toHaveBeenCalled();
 		});
 
 		it("TC-CORE-012: Actualizar (PUT /admin/vehicles/:id -> 200) y eliminar vehículo (DELETE -> 204)", async () => {

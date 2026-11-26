@@ -128,7 +128,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | **Auditado y Aprobado (`PASS` + `GET /admin/vehicles` + `100%` Mutación)** |
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | **Auditado y Aprobado (`PASS` + Conteo Invariable + `100%` Mutación)** |
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | **Auditado y Aprobado (`PASS` + Aislamiento + `100%` Mutación)** |
-| 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | Pendiente de auditoría individual |
+| 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | **Auditado y Aprobado (`PASS` + `USER`/`ADMIN` + `100%` Mutación)** |
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | Pendiente de auditoría individual |
 | 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | Pendiente de auditoría individual |
 | 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | Pendiente de auditoría individual |
@@ -629,4 +629,58 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/contracts/vehicles/register-vehicle-request-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`65/65` tests en verde** (`10.65 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 10. `TC-CORE-011` — Listado de vehículos disponibles por fecha
+
+#### 10.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-011`
+- **Módulo:** Veículos
+- **Requisito / US:** `RF-03` — Listado de vehículos disponibles para un intervalo de fechas (`predictedStartDate`/`predictedEndDate`), excluyendo vehículos con conflicto de agenda.
+- **Endpoint y Escenario:** `GET /vehicles/available?predictedStartDate=2026-03-10T08:00:00.000Z&predictedEndDate=2026-03-10T18:00:00.000Z` con `USER JWT` y `ADMIN JWT`, más escenarios de reglas de intervalo inválido (`400`), consulta sin fechas (`fetchAllAvailable`), filtro por `date=YYYY-MM-DD` (`fetchAllRequestableForSchedule`) y pruebas defensivas directas del caso de uso `fetchAvailableVehicles`.
+- **Precondiciones (PDF):** Vehículos registrados; `USER` o `ADMIN` JWT válido.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 993–1159).
+- **Código bajo prueba:** `core-service/src/use-cases/vehicles/fetch-available-vehicles.ts`, `core-service/src/routes/vehicle-router.ts` (`GET /vehicles/available`), `core-service/src/contracts/vehicles/list-available-vehicles-query-schema.ts`, `core-service/src/contracts/vehicles/vehicle-response-schema.ts`.
+
+#### 10.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` reales) combinada con **pruebas unitarias defensivas** sobre `fetchAvailableVehicles(...)` para cubrir validaciones de dominio que la capa HTTP intercepta previamente mediante Zod. Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`fetchAllAvailable`, `fetchAllRequestableForSchedule`), `@/domains/requests/db/repository` (`findVehicleScheduleConflict`) y `@/messaging/*` (RabbitMQ). *(La resolución de conflictos de agenda en SQL se simula en `findVehicleScheduleConflict`; no consulta PostgreSQL real).*
+- **Categoría:** `happy path` + `boundary` (igualdad `end === start` y orden invertido `end < start`) + `failure` (parámetro parcial / período inválido).
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia (Roles y Modos de Consulta):** `USER JWT` y `ADMIN JWT`; consulta con intervalo completo (`predictedStartDate` + `predictedEndDate`), sin fechas (`fetchAllAvailable`) y con `date=YYYY-MM-DD` (`fetchAllRequestableForSchedule`).
+  - **Análisis de Valor Límite (Intervalo de Fechas):** `end === start`, `end < start`, fecha inicial sin fecha final y fecha final sin fecha inicial.
+  - **Criterio de Cobertura de Ramas (V8) y Mutación (StrykerJS):** alcanzar `100%` de cobertura y `100%` de mutation score en `src/use-cases/vehicles/fetch-available-vehicles.ts`.
+
+#### 10.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `GET /vehicles/available?predictedStartDate=...&predictedEndDate=...` con `USER JWT` o `ADMIN JWT` responde `HTTP 200` devolviendo únicamente los vehículos disponibles sin conflicto en el intervalo, invocando `findVehicleScheduleConflict` con `vehicleId`, `Date` exactos e `ignoredRequestId: undefined`.
+  - Intervalos inválidos (`end === start`, `end < start` o solo una fecha) son rechazados con `HTTP 400` en la ruta (sin consultar repositorios) y lanzan `InvalidRequestPeriodError` (`"A data final deve ser maior que a data inicial"`) en `fetchAvailableVehicles`.
+  - Sin fechas en query retorna `HTTP 200` vía `fetchAllAvailable`; con `date=YYYY-MM-DD` retorna `HTTP 200` vía `fetchAllRequestableForSchedule`.
+
+#### 10.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` parcial / `MUTANTE SOBREVIVIENTE` (`50.00%` Mutación) y ramas sin cubrir**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-011"`):** `1 passed | 40 skipped (41)` en `81 ms` (`responseTime: 8.83 ms`).
+  - **Cobertura V8 inicial (`src/use-cases/vehicles/fetch-available-vehicles.ts`):** `73.33% Stmts | 58.33% Branch | 83.33% Funcs | 78.57% Lines` (líneas sin cubrir: `23-27, 35`).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/vehicles/fetch-available-vehicles.ts"`):** **`50.00%` total / `60.87%` covered** (`28` mutantes: `14` muertos, **`9` sobrevivientes**, **`5` sin cobertura**, `0` errores; `37 s`).
+  - **Debilidades detectadas:**
+    1. Solo probaba con `USER JWT`, sin cubrir explícitamente `ADMIN JWT` mencionado en las precondiciones del PDF.
+    2. No verificaba los argumentos exactos (`Date` e `ignoredRequestId`) pasados a `findVehicleScheduleConflict`.
+    3. Dejaba sin cobertura y con mutantes sobrevivientes las ramas sin fechas (`fetchAllAvailable`), con `date` (`fetchAllRequestableForSchedule`) y la guardia defensiva de período inválido (`lines 22-36`).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se amplió `TC-CORE-011` en `core-service/tests/david-core.spec.ts` (de `1` a **`11` pruebas**):
+    1. `it.each` con **`driver (USER JWT)`** y **`admin (ADMIN JWT)`** validando `HTTP 200`, filtrado del vehículo ocupado y argumentos exactos pasados a `findVehicleScheduleConflict`.
+    2. `it.each` de **3 reglas HTTP de intervalo inválido** (`end === start`, `end < start`, solo `predictedStartDate`) → `HTTP 400` sin invocar repositorios.
+    3. **Consulta sin fechas** (`GET /vehicles/available`) → `HTTP 200` invocando únicamente `fetchAllAvailable`.
+    4. **Consulta solo por `date=2026-03-10`** → `HTTP 200` invocando únicamente `fetchAllRequestableForSchedule`.
+    5. `it.each` de **4 pruebas unitarias defensivas** llamando directamente a `fetchAvailableVehicles(input)` (solo `start`, solo `end`, `end === start`, `end < start`) → rechaza con `InvalidRequestPeriodError` sin consultar repositorios.
+
+- **Revalidación (después de la corrección):** **`PASS` (`11/11` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-011"`):** `11 passed | 40 skipped (51)` en `104 ms`.
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/vehicles/fetch-available-vehicles.ts"`):** subió de `50.00%` a **`100.00%` total / `100.00%` covered** (`28/28` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores; `46 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/vehicles/fetch-available-vehicles.ts`: subió de `73.33% / 58.33%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`75/75` tests en verde** (`10.54 s`), cobertura global `35.94% Stmts | 27.46% Branch | 26.51% Funcs | 35.77% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
