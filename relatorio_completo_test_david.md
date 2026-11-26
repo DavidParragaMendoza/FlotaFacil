@@ -119,7 +119,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | Orden | ID Oficial (`Casos de Teste — SIF.pdf`) | Módulo | Requisito | Descripción | Estado de Auditoría |
 |---|---|---|---|---|---|
 | 1 | `TC-CORE-001` | Autenticação | `RF-01` | Login de administrador válido | **Auditado y Aprobado (`PASS` + `100%` Mutación)** |
-| 2 | `TC-CORE-002` | Autenticação | `RF-01` | Campos de login vazios | Pendiente de auditoría individual |
+| 2 | `TC-CORE-002` | Autenticação | `RF-01` | Campos de login vazios | **Auditado y Aprobado (`PASS` + Aislamiento de Campos)** |
 | 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | Pendiente de auditoría individual |
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
 | 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | Pendiente de auditoría individual |
@@ -187,4 +187,58 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/use-cases/authenticate-admin.ts`: subió de `77.77% Stmts / 50% Branch` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`39/39` tests en verde** (`5.46 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 2. `TC-CORE-002` — Campos de login vacíos
+
+#### 2.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-002`
+- **Módulo:** Autenticação
+- **Requisito / US:** `RF-01` — Validación de credenciales obligatorias en inicio de sesión de administrador.
+- **Endpoint y Escenario:** `POST /admin/auth` con `cpf` y `password` vacíos (`""`), complementado con aislamiento individual por campo vacío y cuerpo vacío (`{}`).
+- **Precondiciones (PDF):** Core activo (instancia real de Fastify con `app.inject` y validación Zod activa).
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 296–368).
+- **Código bajo prueba:** `core-service/src/contracts/users/user-login-schema.ts` (`adminLoginSchema`), `core-service/src/routes/auth-router.ts` (`POST /admin/auth`), `core-service/src/app.ts` (`validatorCompiler` y `setErrorHandler`).
+
+#### 2.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / validación de contrato** sobre Fastify real (`app.inject` + `fastify-type-provider-zod`). Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserAdminByCpf`) para verificar negativamente que no se consulta base de datos, y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `failure` / `special-input` (campos vacíos y ausentes).
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia Negativa y Aislamiento de Variables:** verificación conjunta (`cpf: ""`, `password: ""`), aislamiento individual (`solo cpf vacío`, `solo password vacío`) y omisión total de propiedades (`{}`).
+  - **Verificación Negativa de Efectos:** comprobar que no se emite `token` y que `findUserAdminByCpf` presenta `0` invocaciones.
+  - **Análisis de Mutación (StrykerJS):** auditoría sobre `src/contracts/users/user-login-schema.ts`.
+
+#### 2.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/auth` responde `HTTP 400` en cada entrada vacía o ausente.
+  - El cuerpo JSON de error (`body.message`) identifica ambos campos (`cpf` y `password`) cuando ambos faltan o están vacíos, y únicamente el campo defectuoso cuando solo uno está vacío.
+  - Ningún `token` es emitido (`body` no contiene la propiedad `token`).
+  - `findUserAdminByCpf` nunca es invocado (`not.toHaveBeenCalled()`).
+
+#### 2.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` parcial / Cobertura de aislamiento incompleta**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-002"`):** `1 passed | 14 skipped (15)` en `56 ms` (`responseTime: 7.93 ms`).
+  - **Debilidad detectada:** El test original solo enviaba `{ cpf: "", password: "" }` juntos en una única petición; no aislaba si fallaba cada campo por separado ni qué ocurría cuando los campos obligatorios venían ausentes (`{}`).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/contracts/users/user-login-schema.ts"`):** **`70.00%` total (`7/10` muertos, `3` sobrevivientes)** sobre el archivo completo:
+    - Todos los mutantes de campos vacíos/obligatorios de `adminLoginSchema` fueron eliminados (`100%` del alcance propio de `TC-CORE-002`).
+    - Los `3` mutantes sobrevivientes del archivo corresponden a ámbitos externos a `TC-CORE-002`:
+      1. `[Survived] Regex` (`src/contracts/users/user-login-schema.ts:11:40`): `/^\d+$/` -> `/\d+$/` en `adminLoginSchema.cpf` *(pertenece a formato de CPF — se resolverá explícitamente en **`TC-CORE-003`**)*.
+      2. `[Survived] ObjectLiteral` (`src/contracts/users/user-login-schema.ts:3:41`) y `[Survived] MethodExpression` (`src/contracts/users/user-login-schema.ts:5:12`) en `userLoginSchema` (`POST /auth` de conductores, fuera del roteiro `POST /admin/auth` de `TC-CORE-002`).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** Un único caso combinado `{ cpf: "", password: "" }` no garantiza de forma independiente el mensaje específico por campo ni el rechazo por propiedades faltantes (`undefined`).
+  - **Acción correctiva:** Se añadieron **3 tests complementarios de aislamiento** en `core-service/tests/david-core.spec.ts` bajo `TC-CORE-002`:
+    1. `TC-CORE-002 (aislamiento - solo cpf vacío)`: `{ cpf: "", password: "123456" }` -> `400`, reporta `cpf` y no `password`.
+    2. `TC-CORE-002 (aislamiento - solo password vacío)`: `{ cpf: "00000000000", password: "" }` -> `400`, reporta `password` y no `cpf`.
+    3. `TC-CORE-002 (aislamiento - campos obligatorios ausentes)`: `{}` -> `400`, reporta `cpf` y `password`.
+
+- **Revalidación (después de la corrección):** **`PASS` (`4/4` tests en `TC-CORE-002`)**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-002"`):** `4 passed | 14 skipped (18)` en `62 ms` (`responseTime`: `6.80 ms` ambos vacíos, `0.97 ms` solo `cpf`, `0.71 ms` solo `password`, `0.57 ms` cuerpo `{}`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/contracts/users/user-login-schema.ts"`):** `70.00%` (`7/10` muertos, `3` sobrevivientes documentados arriba; `0` sobrevivientes de campos vacíos en `adminLoginSchema`; el mutante de regex en línea 11 queda trazado para eliminarse en `TC-CORE-003`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/contracts/users/user-login-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`42/42` tests en verde** (`6.53 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

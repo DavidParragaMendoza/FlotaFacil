@@ -313,6 +313,60 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(body.message).toContain("password");
 		});
 
+		it("TC-CORE-002 (aislamiento - solo cpf vacío): rechaza con 400 identificando únicamente cpf", async () => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {
+					cpf: "",
+					password: "123456",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(findUserAdminByCpf).not.toHaveBeenCalled();
+
+			const body = response.json();
+			expect(body).not.toHaveProperty("token");
+			expect(body.message).toContain("cpf");
+			expect(body.message).not.toContain("password");
+		});
+
+		it("TC-CORE-002 (aislamiento - solo password vacío): rechaza con 400 identificando únicamente password", async () => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {
+					cpf: "00000000000",
+					password: "",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(findUserAdminByCpf).not.toHaveBeenCalled();
+
+			const body = response.json();
+			expect(body).not.toHaveProperty("token");
+			expect(body.message).toContain("password");
+			expect(body.message).not.toContain("cpf");
+		});
+
+		it("TC-CORE-002 (aislamiento - campos obligatorios ausentes): rechaza {} con 400 identificando cpf y password", async () => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(findUserAdminByCpf).not.toHaveBeenCalled();
+
+			const body = response.json();
+			expect(body).not.toHaveProperty("token");
+			expect(body.message).toContain("cpf");
+			expect(body.message).toContain("password");
+		});
+
 		it("TC-CORE-003: CPF con longitud o formato inválido (POST /admin/auth -> 400)", async () => {
 			const invalidCpfs = [
 				"1234567890", // 10 caracteres (menor al mínimo de 11)
