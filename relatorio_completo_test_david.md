@@ -127,7 +127,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | **Auditado y Aprobado (`PASS` + `100%` Mutación Contrato)** |
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | **Auditado y Aprobado (`PASS` + `GET /admin/vehicles` + `100%` Mutación)** |
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | **Auditado y Aprobado (`PASS` + Conteo Invariable + `100%` Mutación)** |
-| 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | Pendiente de auditoría individual |
+| 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | **Auditado y Aprobado (`PASS` + Aislamiento + `100%` Mutación)** |
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | Pendiente de auditoría individual |
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | Pendiente de auditoría individual |
 | 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | Pendiente de auditoría individual |
@@ -580,4 +580,53 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/use-cases/vehicles/register-vehicle.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`6.26 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 9. `TC-CORE-010` — Enums y tipos de datos inválidos
+
+#### 9.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-010`
+- **Módulo:** Veículos
+- **Requisito / US:** `RF-03` — Validación estricta de tipos numéricos (`year`, `odometer`) y enumeraciones (`status`, `type`) en el alta de vehículos.
+- **Endpoint y Escenario:** `POST /admin/vehicles` con `status`/`type` fuera de enum y `year`/`odometer` no numéricos (prueba combinada del PDF + aislamiento individual por campo, incluyendo strings numéricos `"2024"`/`"1200"` para verificar ausencia de coerción).
+- **Precondiciones (PDF):** Admin JWT.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 915–989).
+- **Código bajo prueba:** `core-service/src/contracts/vehicles/register-vehicle-request-schema.ts`, `core-service/src/routes/vehicle-router.ts` (`POST /admin/vehicles`).
+
+#### 9.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / validación de contrato** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` reales). Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`findByPlate`, `insertVehicle`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `failure` + `special-input`.
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia Negativa y Aislamiento de Variables:** verificación combinada de los 4 campos inválidos más bloque `it.each` de 4 pruebas individuales (una por cada campo) verificando tipado estricto (`z.number()` sin coerción de strings numéricos) y validez de enum (`VEHICLE_STATUSES`, `VEHICLE_TYPES`).
+  - **Verificación Negativa de Persistencia:** confirmar `0` invocaciones a `findByPlate`, `insertVehicle` y `createAuditLog`.
+  - **Análisis de Mutación (StrykerJS):** validación sobre `src/contracts/vehicles/register-vehicle-request-schema.ts`.
+
+#### 9.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/vehicles` responde `HTTP 400` en el caso combinado y en cada caso aislado.
+  - `body.message` identifica explícitamente los campos inválidos (`year`, `odometer`, `status`, `type`).
+  - El vehículo **no es persistido** (`findByPlate`, `insertVehicle` y `createAuditLog` con `0` llamadas).
+
+#### 9.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` funcional / Falta de aislamiento individual por campo**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-010"`):** `1 passed | 36 skipped (37)` en `235 ms` (`responseTime: 20.22 ms`).
+  - **Debilidad detectada:** Los 4 campos inválidos se enviaban únicamente juntos en una sola petición y solo con textos alfabéticos (`"dos-mil-veinticuatro"`), sin aislar cada regla ni validar que strings numéricos (`"2024"`, `"1200"`) no sean coercidos silenciosamente.
+  - **StrykerJS inicial (`src/contracts/vehicles/register-vehicle-request-schema.ts`):** `100.00%` (`1/1` muerto, `0` sobrevivientes; `33 s`).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se conservó la prueba combinada conforme al roteiro del PDF y se añadió en `core-service/tests/david-core.spec.ts` un bloque **`it.each` con 4 casos aislados**:
+    1. `year: "2024"` (string numérico no coercible → `400`, identifica `year`).
+    2. `odometer: "1200"` (string numérico no coercible → `400`, identifica `odometer`).
+    3. `status: "STATUS_INEXISTENTE"` (fuera de enum → `400`, identifica `status`).
+    4. `type: "NAVE_ESPACIAL"` (fuera de enum → `400`, identifica `type`).
+
+- **Revalidación (después de la corrección):** **`PASS` (`5/5` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-010"`):** `5 passed | 36 skipped (41)` en `237 ms` (`responseTime`: `21.66 ms` combinado, `3.10 ms` `year`, `2.36 ms` `odometer`, `2.71 ms` `status`, `3.32 ms` `type`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/contracts/vehicles/register-vehicle-request-schema.ts"`):** **`100.00%` total / `100.00%` covered** (`1/1` muerto, `0` sobrevivientes, `0` sin cobertura; `28 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/contracts/vehicles/register-vehicle-request-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`65/65` tests en verde** (`10.65 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

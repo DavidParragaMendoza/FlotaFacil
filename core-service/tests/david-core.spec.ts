@@ -940,6 +940,54 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(createAuditLog).not.toHaveBeenCalled();
 		});
 
+		it.each([
+			{
+				label: "year string numérico no coercible",
+				field: "year",
+				overrides: { year: "2024" },
+			},
+			{
+				label: "odometer string numérico no coercible",
+				field: "odometer",
+				overrides: { odometer: "1200" },
+			},
+			{
+				label: "status fuera de enum",
+				field: "status",
+				overrides: { status: "STATUS_INEXISTENTE" },
+			},
+			{
+				label: "type fuera de enum",
+				field: "type",
+				overrides: { type: "NAVE_ESPACIAL" },
+			},
+		])("TC-CORE-010 (aislamiento - $label): rechaza con 400 identificando $field sin persistir", async ({
+			field,
+			overrides,
+		}) => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/vehicles",
+				headers: getAdminAuthHeader(),
+				payload: {
+					plate: "ABC1D23",
+					model: "Fiat Toro",
+					year: 2024,
+					odometer: 1200,
+					imageUrl: null,
+					status: "AVAILABLE",
+					type: "CAR",
+					...overrides,
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json().message).toContain(field);
+			expect(findByPlate).not.toHaveBeenCalled();
+			expect(insertVehicle).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
 		it("TC-CORE-011: Listado de vehículos disponibles por fecha (GET /vehicles/available -> 200)", async () => {
 			const freeVehicle = makeVehicle({
 				id: VEHICLE_ID,
