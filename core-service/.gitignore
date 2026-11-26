@@ -81,6 +81,8 @@ $RECYCLE.BIN/
 coverage/
 .nyc_output/
 *.lcov
+.stryker-tmp/
+reports/
 
 # -----------------------------------------------------------------------------
 # Package managers — lock files (keep only the one you use)

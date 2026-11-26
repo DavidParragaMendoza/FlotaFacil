@@ -135,7 +135,9 @@ import {
 	insertVehicle,
 	updateVehicle as updateVehicleRepository,
 } from "@/domains/vehicles/db/repository";
+import { saveTrackingMapToMinio } from "@/minio/save-tracking-map";
 import { requestRouteReportFromAiService } from "@/services/ai-report-service";
+import { generateTrackingStaticMap } from "@/services/locationiq-static-map-service";
 import { createAuditLog } from "@/use-cases/audit-log-service";
 import { authenticate } from "@/use-cases/authenticate";
 import { authenticateAdmin } from "@/use-cases/authenticate-admin";
@@ -775,6 +777,14 @@ describe("tracks e relatorios", () => {
 	it("cria track apenas quando a rota existe", async () => {
 		vi.mocked(findRouteById).mockResolvedValue(makeRoute());
 		vi.mocked(insertTrack).mockResolvedValue(makeTrack());
+		vi.mocked(generateTrackingStaticMap).mockResolvedValue(
+			Buffer.from("mock-map-image"),
+		);
+		vi.mocked(saveTrackingMapToMinio).mockResolvedValue({
+			bucket: "sif-dev",
+			imageKey: `tracks/${ids.route}/${ids.track}.png`,
+			imageUrl: `http://localhost:9000/sif-dev/tracks/${ids.route}/${ids.track}.png`,
+		});
 
 		const result = await createTrackUseCase({
 			routeId: ids.route,

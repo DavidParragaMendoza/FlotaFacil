@@ -5,6 +5,8 @@
 	"scripts": {
 		"dev": "tsx watch src/server.ts",
 		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:mutation": "stryker run",
 		"lint": "biome check",
 		"build": "tsc --project tsconfig.build.json && tsc-alias",
 		"start": "node dist/server.js",
@@ -18,10 +20,13 @@
 	"description": "",
 	"devDependencies": {
 		"@biomejs/biome": "2.4.10",
+		"@stryker-mutator/core": "^10.1.1",
+		"@stryker-mutator/vitest-runner": "^10.1.1",
 		"@types/amqplib": "^0.10.8",
 		"@types/bcryptjs": "^2.4.6",
 		"@types/node": "^25.5.2",
 		"@types/pg": "^8.20.0",
+		"@vitest/coverage-v8": "^4.1.10",
 		"drizzle-kit": "^0.31.10",
 		"tsc-alias": "^1.8.16",
 		"tsx": "^4.21.0",
