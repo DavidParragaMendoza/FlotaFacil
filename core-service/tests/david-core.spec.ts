@@ -862,8 +862,23 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			});
 		});
 
-		it("TC-CORE-009: Registro de vehículo con placa duplicada (POST /admin/vehicles -> 409/400)", async () => {
-			vi.mocked(findByPlate).mockResolvedValue(makeVehicle());
+		it("TC-CORE-009 (PDF: TC-CORE-09): Registro de vehículo con placa duplicada (POST /admin/vehicles -> 400 sin aumentar conteo)", async () => {
+			const storedVehicles = [makeVehicle()];
+			vi.mocked(findByPlate).mockImplementation(async (plate) =>
+				storedVehicles.find((vehicle) => vehicle.plate === plate),
+			);
+			vi.mocked(fetchAllVehicles).mockImplementation(
+				async () => storedVehicles,
+			);
+
+			const beforeList = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: getAdminAuthHeader(),
+			});
+			expect(beforeList.statusCode).toBe(200);
+			const initialCount = beforeList.json().length;
+			expect(initialCount).toBe(1);
 
 			const response = await app.inject({
 				method: "POST",
@@ -880,13 +895,21 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				},
 			});
 
-			expect([400, 409]).toContain(response.statusCode);
 			expect(response.statusCode).toBe(400);
+			expect(findByPlate).toHaveBeenCalledWith("ABC1D23");
 			expect(response.json()).toEqual({
 				message: "A placa desse veículo já foi registrada",
 			});
 			expect(insertVehicle).not.toHaveBeenCalled();
 			expect(createAuditLog).not.toHaveBeenCalled();
+
+			const afterList = await app.inject({
+				method: "GET",
+				url: "/admin/vehicles",
+				headers: getAdminAuthHeader(),
+			});
+			expect(afterList.statusCode).toBe(200);
+			expect(afterList.json()).toHaveLength(initialCount);
 		});
 
 		it("TC-CORE-010: Enums y tipos de datos inválidos (POST /admin/vehicles -> 400)", async () => {

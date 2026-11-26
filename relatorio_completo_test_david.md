@@ -126,7 +126,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | **Auditado y Aprobado (`PASS` + Paso 2 `GET` + `100%` Mutación)** |
 | 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | **Auditado y Aprobado (`PASS` + `100%` Mutación Contrato)** |
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | **Auditado y Aprobado (`PASS` + `GET /admin/vehicles` + `100%` Mutación)** |
-| 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | Pendiente de auditoría individual |
+| 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | **Auditado y Aprobado (`PASS` + Conteo Invariable + `100%` Mutación)** |
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | Pendiente de auditoría individual |
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | Pendiente de auditoría individual |
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | Pendiente de auditoría individual |
@@ -527,4 +527,57 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
     - `src/use-cases/vehicles/fetch-vehicles.ts`: subió de `0%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - `src/routes/vehicle-router.ts`: subió de `80.95%` a **`90.47%`**.
     - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`5.59 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 8. `TC-CORE-009` *(PDF: `TC-CORE-09`)* — Registro de vehículo con placa duplicada
+
+#### 8.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-09` *(normalizado en la suite como `TC-CORE-009` por coherencia numérica).*
+- **Módulo:** Veículos
+- **Requisito / US:** `RF-03` — Placa duplicada es rechazada al registrar vehículos.
+- **Endpoint y Escenario:** `POST /admin/vehicles` con placa ya existente (`"ABC1D23"`), verificando el conteo de vehículos en `GET /admin/vehicles` antes y después del intento.
+- **Precondiciones (PDF):** Vehículo seed con la misma placa; Admin JWT.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 865–913).
+- **Código bajo prueba:** `core-service/src/use-cases/vehicles/register-vehicle.ts`, `core-service/src/domains/vehicles/errors.ts` (`PlateAlreadyRegisteredError`), `core-service/src/routes/vehicle-router.ts`.
+
+#### 8.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / regla de negocio** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` + `setErrorHandler` reales). Dependencias simuladas con `vi.mock`: `@/domains/vehicles/db/repository` (`findByPlate`, `insertVehicle`, `fetchAll`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ). *(El conteo de vehículos se verifica mediante estado en memoria del mock, no contra PostgreSQL real).*
+- **Categoría:** `failure` (colisión de unicidad de dominio).
+- **Criterios y Técnicas Aplicadas:**
+  - **Partición de Equivalencia Negativa (Unicidad de Placa):** intento de registro con placa ya presente en el repositorio simulado.
+  - **Validación de Contrato de Error:** verificación exacta del código HTTP definido en `PlateAlreadyRegisteredError` (`400`, dentro del rango `409/400` contemplado por el PDF) y del mensaje `"A placa desse veículo já foi registrada"`.
+  - **Verificación Negativa e Invariante de Conteo:** comprobar que `insertVehicle` y `createAuditLog` no son llamados y que `GET /admin/vehicles` conserva exactamente el mismo conteo (`1` antes y `1` después).
+
+#### 8.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/vehicles` responde `HTTP 400` *(conforme al contrato de `PlateAlreadyRegisteredError` en `src/domains/vehicles/errors.ts:6`, dentro del `409/400` especificado)* con `{ message: "A placa desse veículo já foi registrada" }`.
+  - `findByPlate("ABC1D23")` es invocado; `insertVehicle` y `createAuditLog` presentan `0` invocaciones.
+  - La cantidad de vehículos en `GET /admin/vehicles` **no aumenta** (`1` antes y `1` después).
+
+#### 8.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` parcial / Incompleto en verificación de conteo y con aserción redundante**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-009"`):** `1 passed | 36 skipped (37)` en `90 ms` (`responseTime: 10.70 ms`).
+  - **Debilidades detectadas:**
+    1. No comprobaba la invariante del PDF *"a contagem de veículos não aumenta"* mediante `GET /admin/vehicles`.
+    2. No validaba que `findByPlate` recibiera `"ABC1D23"`.
+    3. Tenía una aserción redundante (`expect([400, 409]).toContain(response.statusCode)` seguida de `expect(response.statusCode).toBe(400)`).
+    4. No dejaba explícita la correspondencia con el typo `TC-CORE-09` del PDF.
+  - **StrykerJS inicial (`src/use-cases/vehicles/register-vehicle.ts`):** ya se encontraba en **`100.00%`** (`6/6` muertos, `0` sobrevivientes).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se actualizó `TC-CORE-009` en `core-service/tests/david-core.spec.ts` para:
+    1. Inicializar un listado en memoria `storedVehicles = [makeVehicle()]` y comprobar el conteo inicial vía `GET /admin/vehicles` (`1`).
+    2. Enviar `POST /admin/vehicles` con placa `"ABC1D23"`, validando `HTTP 400`, `findByPlate("ABC1D23")`, mensaje exacto y `0` llamadas a `insertVehicle`/`createAuditLog`.
+    3. Comprobar nuevamente `GET /admin/vehicles` confirmando que la longitud permanece en `1`.
+    4. Eliminar la aserción redundante y documentar explícitamente el alias `PDF: TC-CORE-09`.
+
+- **Revalidación (después de la corrección):** **`PASS` + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-009"`):** `1 passed | 36 skipped (37)` en `105 ms` (`responseTime`: `8.87 ms` `GET` inicial, `4.42 ms` `POST 400`, `0.61 ms` `GET` final).
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/vehicles/register-vehicle.ts"`):** **`100.00%` total / `100.00%` covered** (`6/6` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores; `17 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/vehicles/register-vehicle.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`61/61` tests en verde** (`6.26 s`), cobertura global `35.62% Stmts | 26.30% Branch | 26.17% Funcs | 35.52% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
