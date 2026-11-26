@@ -123,7 +123,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | **Auditado y Aprobado (`PASS` + `100%` Mutación `adminLoginSchema`)** |
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
 | 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | **Auditado y Aprobado (`PASS` + `100%` Mutación Hooks)** |
-| 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | Pendiente de auditoría individual |
+| 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | **Auditado y Aprobado (`PASS` + Paso 2 `GET` + `100%` Mutación)** |
 | 6 | `TC-CORE-007` | Usuários | `RF-01` | E-mail inválido e campos obrigatórios | Pendiente de auditoría individual |
 | 7 | `TC-CORE-008` | Veículos | `RF-03` | Registrar veículo válido | Pendiente de auditoría individual |
 | 8 | `TC-CORE-009` *(PDF: `TC-CORE-09`)* | Veículos | `RF-03` | Placa duplicada | Pendiente de auditoría individual |
@@ -356,4 +356,64 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
     - `src/hooks/verify-jwt.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - `src/hooks/authorize.ts`: subió de `66.66% Stmts / 50% Branch` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`53/53` tests en verde** (`5.58 s`), cobertura global `34.65% Stmts | 25.72% Branch | 24.49% Funcs | 34.70% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 5. `TC-CORE-006` — Crear usuario con datos válidos
+
+#### 5.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-006`
+- **Módulo:** Usuários
+- **Requisito / US:** `RF-01` — Creación de usuario administrativo/conductor con unicidad de e-mail/CPF, contraseña hasheada no reversible y consulta por ID.
+- **Endpoint y Escenario:**
+  1. `POST /admin/users` con nombre, email, CPF, rol y contraseña válidos (JWT `admin`).
+  2. `GET /admin/users/:id` con el ID devuelto en el Paso 1.
+  - Complementado con colisiones de unicidad (`CPF` duplicado, `email` duplicado) y consulta de ID inexistente (`404`).
+- **Precondiciones (PDF):** Admin JWT; e-mail y CPF no duplicados.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 511–663).
+- **Código bajo prueba:** `core-service/src/routes/user-router.ts` (`POST /admin/users`, `GET /admin/users/:id`), `core-service/src/use-cases/users/create-user.ts`, `core-service/src/use-cases/users/fetch-user-by-id.ts`.
+
+#### 5.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` + `bcryptjs` reales). Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserByEmail`, `findUserByCpf`, `insertUser`, `findUserById`), `@/use-cases/audit-log-service` (`createAuditLog`) y `@/messaging/*` (RabbitMQ). *(No escribe físicamente en PostgreSQL; simula el almacenamiento en memoria dentro del test para enlazar `POST` y `GET`).*
+- **Categoría:** `happy path` (creación + consulta por ID) + `failure` (duplicidad de CPF/email y consulta `404` para mutación).
+- **Criterios y Técnicas Aplicadas:**
+  - **Verificación de Flujo Completo del Roteiro (`POST` → `GET`):** cumplimiento estricto de los 2 pasos de `Casos de Teste — SIF.pdf`.
+  - **Verificación Criptográfica (`bcryptjs`):** validación de que `insertUser` recibe un hash irreversible (`bcrypt.compare === true`, distinto del texto plano) y de que ni `POST` ni `GET` exponen `password` ni `passwordHash`.
+  - **Cobertura de Ramas V8 y Mutación (StrykerJS):** alcanzar `100%` en `create-user.ts` y `fetch-user-by-id.ts` (incorporando también `fetch-user-by-id.ts` a `core-service/stryker.config.mjs`).
+
+#### 5.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - **Paso 1 (`POST /admin/users`):** `HTTP 201`; la respuesta contiene `id` y los datos del usuario creado sin `password`/`passwordHash`; el payload enviado a `insertUser` contiene `passwordHash` no reversible (`bcryptjs`); se invoca `createAuditLog` con `USER.CREATED`.
+  - **Paso 2 (`GET /admin/users/:id`):** `HTTP 200`; devuelve el usuario creado correspondiente al `id`, sin exponer `passwordHash`.
+- Escenarios complementarios de unicidad y error:
+  - CPF duplicado → `HTTP 400` (`{ message: "CPF já está em uso" }`), sin invocar `insertUser` ni `createAuditLog`.
+  - E-mail duplicado → `HTTP 400` (`{ message: "E-mail já está em uso" }`), sin invocar `insertUser` ni `createAuditLog`.
+  - `GET /admin/users/:id` inexistente → `HTTP 404` (`{ message: "Usuário não encontrado" }`).
+
+#### 5.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`INCOMPLETO` frente al PDF + `MUTANTES SOBREVIVIENTES / SIN COBERTURA` (`52.94%` combinado)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-006"`):** `1 passed | 28 skipped (29)` en `240 ms` (`responseTime: 100.17 ms`), **pero omitía el Paso 2 (`GET /admin/users/:id`)** del roteiro oficial.
+  - **Cobertura V8 inicial:** `create-user.ts` al `88.88% Stmts | 83.33% Branch` (línea 26 sin cubrir) y **`fetch-user-by-id.ts` al `0% Stmts | 0% Branch | 0% Funcs | 0% Lines`**.
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/users/create-user.ts,src/use-cases/users/fetch-user-by-id.ts"`):** **`52.94%` total (`9/17` muertos, `1` sobreviviente, `7` sin cobertura)**:
+    - `create-user.ts`: `81.82%` (`9/11`) — sobrevivía `[Survived] ConditionalExpression` y `[NoCoverage] CallExpression` en la línea 26 (`if (existingCpf) throw new CpfAlreadyInUseError()`).
+    - `fetch-user-by-id.ts`: **`0.00%`** (`0/6`, los `6` mutantes sin cobertura).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - **Causa raíz:** El test previo no implementó el Paso 2 (`GET /admin/users/:id`) del PDF oficial ni probó rechazo por CPF duplicado o usuario inexistente.
+  - **Acción correctiva:**
+    1. Se completó `TC-CORE-006` en `core-service/tests/david-core.spec.ts` enlazando el registro devuelto por `insertUser` con `findUserById` y ejecutando el **Paso 2 (`GET /admin/users/:id` → `200 OK`)** con verificación de campos y ocultamiento de `passwordHash`.
+    2. Se añadieron **3 tests complementarios** para matar el `100%` de mutantes: `CPF duplicado` (`400`), `email duplicado` (`400`) y `GET /admin/users/:id inexistente` (`404`).
+    3. Se incorporó `src/use-cases/users/fetch-user-by-id.ts` a la lista `mutate` de `core-service/stryker.config.mjs`.
+
+- **Revalidación (después de la corrección):** **`PASS` (`4/4` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-006"`):** `4 passed | 28 skipped (32)` en `248 ms` (`responseTime`: `98.01 ms` `POST 201`, `0.85 ms` `GET 200`, `2.28 ms` CPF duplicado `400`, `0.98 ms` email duplicado `400`, `0.47 ms` `GET 404`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/users/create-user.ts,src/use-cases/users/fetch-user-by-id.ts"`):** subió de `52.94%` a **`100.00%` total / `100.00%` covered** (`45 s`):
+    - `create-user.ts`: **`100.00%`** (`11/11` muertos, `0` sobrevivientes, `0` sin cobertura).
+    - `fetch-user-by-id.ts`: subió de `0.00%` a **`100.00%`** (`6/6` muertos, `0` sobrevivientes, `0` sin cobertura).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/users/create-user.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - `src/use-cases/users/fetch-user-by-id.ts`: subió de `0%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`56/56` tests en verde** (`5.82 s`), cobertura global `35.21% Stmts | 26.30% Branch | 25.16% Funcs | 35.19% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

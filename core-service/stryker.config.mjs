@@ -15,6 +15,7 @@ export default {
 		"src/hooks/authorize.ts",
 		"src/use-cases/authenticate-admin.ts",
 		"src/use-cases/users/create-user.ts",
+		"src/use-cases/users/fetch-user-by-id.ts",
 		"src/use-cases/vehicles/register-vehicle.ts",
 		"src/use-cases/vehicles/fetch-available-vehicles.ts",
 		"src/use-cases/vehicles/update-vehicle.ts",

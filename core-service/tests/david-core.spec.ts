@@ -508,16 +508,24 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 	});
 
 	describe("2. Gestión de Usuarios", () => {
-		it("TC-CORE-006: Registro de usuario con datos válidos (POST /admin/users -> 201)", async () => {
+		it("TC-CORE-006: Registro de usuario con datos válidos (POST /admin/users -> 201 y GET /admin/users/:id -> 200)", async () => {
+			let createdUserRecord: ReturnType<typeof makeDriverUser> | undefined;
 			vi.mocked(findUserByEmail).mockResolvedValue(undefined);
 			vi.mocked(findUserByCpf).mockResolvedValue(undefined);
-			vi.mocked(insertUser).mockImplementation(async (data) =>
-				makeDriverUser({
+			vi.mocked(insertUser).mockImplementation(async (data) => {
+				createdUserRecord = makeDriverUser({
 					...data,
 					passwordHash: data.passwordHash,
-				}),
+				});
+				return createdUserRecord;
+			});
+			vi.mocked(findUserById).mockImplementation(async (id) =>
+				createdUserRecord && createdUserRecord.id === id
+					? createdUserRecord
+					: undefined,
 			);
 
+			// Paso 1: POST /admin/users
 			const response = await app.inject({
 				method: "POST",
 				url: "/admin/users",
@@ -563,6 +571,94 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				action: "USER.CREATED",
 				entityId: USER_ID,
 				performedBy: ADMIN_ID,
+			});
+
+			// Paso 2 (Roteiro PDF): GET /admin/users/:id
+			const getResponse = await app.inject({
+				method: "GET",
+				url: `/admin/users/${body.id}`,
+				headers: getAdminAuthHeader(),
+			});
+
+			expect(getResponse.statusCode).toBe(200);
+			expect(findUserById).toHaveBeenCalledWith(USER_ID);
+			const fetchedUser = getResponse.json();
+			expect(fetchedUser).toMatchObject({
+				id: USER_ID,
+				name: "Carlos Motorista",
+				email: "carlos@sif.com",
+				cpf: "12345678901",
+				role: "driver",
+			});
+			expect(fetchedUser).not.toHaveProperty("passwordHash");
+			expect(fetchedUser).not.toHaveProperty("password");
+		});
+
+		it("TC-CORE-006 (mutación - CPF duplicado): rechaza creación con 400 sin insertar ni auditar", async () => {
+			vi.mocked(findUserByEmail).mockResolvedValue(undefined);
+			vi.mocked(findUserByCpf).mockResolvedValue(makeDriverUser());
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/users",
+				headers: getAdminAuthHeader(),
+				payload: {
+					name: "Carlos Motorista",
+					email: "nuevo@sif.com",
+					password: "driverPassword123",
+					cpf: "12345678901",
+					phone: "84999999999",
+					role: "driver",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message: "CPF já está em uso",
+			});
+			expect(insertUser).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-006 (mutación - email duplicado): rechaza creación con 400 sin insertar ni auditar", async () => {
+			vi.mocked(findUserByEmail).mockResolvedValue(makeDriverUser());
+			vi.mocked(findUserByCpf).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/users",
+				headers: getAdminAuthHeader(),
+				payload: {
+					name: "Carlos Motorista",
+					email: "carlos@sif.com",
+					password: "driverPassword123",
+					cpf: "98765432100",
+					phone: "84999999999",
+					role: "driver",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message: "E-mail já está em uso",
+			});
+			expect(insertUser).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-006 (mutación - GET /admin/users/:id inexistente): responde 404 Usuário não encontrado", async () => {
+			vi.mocked(findUserById).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "GET",
+				url: `/admin/users/${USER_ID}`,
+				headers: getAdminAuthHeader(),
+			});
+
+			expect(response.statusCode).toBe(404);
+			expect(findUserById).toHaveBeenCalledWith(USER_ID);
+			expect(response.json()).toEqual({
+				message: "Usuário não encontrado",
 			});
 		});
 
