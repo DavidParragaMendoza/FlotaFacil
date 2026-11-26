@@ -120,7 +120,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 |---|---|---|---|---|---|
 | 1 | `TC-CORE-001` | Autenticação | `RF-01` | Login de administrador válido | **Auditado y Aprobado (`PASS` + `100%` Mutación)** |
 | 2 | `TC-CORE-002` | Autenticação | `RF-01` | Campos de login vazios | **Auditado y Aprobado (`PASS` + Aislamiento de Campos)** |
-| 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | Pendiente de auditoría individual |
+| 3 | `TC-CORE-003` | Autenticação | `RF-01` | CPF com comprimento/formato inválido | **Auditado y Aprobado (`PASS` + `100%` Mutación `adminLoginSchema`)** |
 | — | *(`TC-CORE-004` no existe; fila 4 es `TC-ADMIN-001`)* | Login UI | `RF-01` | Login seed pelo navegador (Playwright `:3000`) | Fuera de alcance `core-service` |
 | 4 | `TC-CORE-005` | RBAC | `RF-02` | Recurso protegido sem JWT | Pendiente de auditoría individual |
 | 5 | `TC-CORE-006` | Usuários | `RF-01` | Criar usuário com dados válidos | Pendiente de auditoría individual |
@@ -241,4 +241,62 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
   - **Cobertura V8 (`npm.cmd run test:coverage`):**
     - `src/contracts/users/user-login-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`42/42` tests en verde** (`6.53 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 3. `TC-CORE-003` — CPF con longitud o formato inválido
+
+#### 3.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-003`
+- **Módulo:** Autenticação
+- **Requisito / US:** `RF-01` — Validación de longitud exacta (11 dígitos) y formato estrictamente numérico de CPF en el login administrativo.
+- **Endpoint y Escenario:** `POST /admin/auth` con CPF de `10` y `12` caracteres (fronteras de longitud) y múltiples variantes con caracteres no numéricos (al final, al inicio, en el medio, con espacios y con puntuación `000.000.000-00`).
+- **Precondiciones (PDF):** Core activo (instancia real de Fastify con `app.inject` y validación Zod).
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 370–418).
+- **Código bajo prueba:** `core-service/src/contracts/users/user-login-schema.ts` (`adminLoginSchema.cpf`), `core-service/src/routes/auth-router.ts` (`POST /admin/auth`).
+
+#### 3.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP / validación de contrato** sobre Fastify real (`app.inject` + `fastify-type-provider-zod`). Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserAdminByCpf`) para verificación negativa y `@/messaging/*` (RabbitMQ).
+- **Categoría:** `boundary` + `special-input` + `failure`.
+- **Criterios y Técnicas Aplicadas:**
+  - **Análisis de Valores Límite (BVA):** `10` dígitos (`min - 1`) y `12` dígitos (`max + 1`) respecto al límite exacto `11`.
+  - **Partición de Equivalencia de Formato (Regex `/^\d+$/`):** caracteres no numéricos en posiciones de borde (inicio `^`, final `$`, intermedio), espacios en blanco y puntuación (`000.000.000-00`).
+  - **Pruebas Parametrizadas (`it.each`):** ejecución y reporte independiente por cada clase/frontera.
+  - **Análisis de Mutación (StrykerJS):** verificación de eliminación de mutantes en `adminLoginSchema` (`src/contracts/users/user-login-schema.ts`).
+
+#### 3.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /admin/auth` responde `HTTP 400` en cada intento con CPF de longitud o formato inválido.
+  - El cuerpo JSON reporta el error asociado al campo `cpf` y **ningún `token` es emitido**.
+  - `findUserAdminByCpf` presenta `0` invocaciones (`not.toHaveBeenCalled()`), confirmando rechazo previo en capa de contrato.
+
+#### 3.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Trazabilidad de Incidente Histórico (Commit `b2d6811`):**
+  - *Nota de auditoría:* Originalmente en el código base, `adminLoginSchema.cpf` (`src/contracts/users/user-login-schema.ts:11`) definía únicamente `z.string().min(11).max(11)` sin validación numérica, por lo que una cadena de 11 caracteres con letras (ej. `"1234567890a"`) superaba el esquema y llegaba a base de datos devolviendo `HTTP 401` en vez de `400`. El agente anterior añadió `.regex(/^\d+$/)` en `b2d6811` pero omitió registrar el fallo inicial en su relatoría; aquí queda trazado formalmente.
+- **Evaluación Inicial (antes de corregir en Fase 1):** **`PASS` funcional / `MUTANTE SOBREVIVIENTE` en Regex (`70.00%` en `user-login-schema.ts`)**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-003"`):** `1 passed | 17 skipped (18)` en `61 ms` (`responseTime`: `7.98 ms`, `0.93 ms`, `0.95 ms`, `0.45 ms`), agrupando 4 entradas en un bucle `for` dentro de un único `it()`.
+  - **Mutante sobreviviente detectado por StrykerJS (`src/contracts/users/user-login-schema.ts:11:40`):**
+    - `[Survived] Regex`: `cpf: z.string().min(11).max(11).regex(/^\d+$/)` mutado a `regex(/\d+$/)`.
+    - **Causa raíz:** La única entrada no numérica de 11 caracteres era `"1234567890a"` (letra al **final**). Al eliminar el ancla de inicio `^`, `/\d+$/` seguía rechazando `"1234567890a"` (porque termina en letra), pero habría aceptado silenciosamente `"a1234567890"` (letra al **inicio**).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se refactorizó `TC-CORE-003` en `core-service/tests/david-core.spec.ts` reemplazando el bucle `for` por **`it.each` con 7 casos granulares** e independientes:
+    1. `"1234567890"` (frontera inferior: `10` dígitos).
+    2. `"123456789012"` (frontera superior: `12` dígitos).
+    3. `"1234567890a"` (`11` chars, no numérico al final — mata mutación del ancla `$`).
+    4. `"a1234567890"` (`11` chars, no numérico al inicio — **mata el mutante sobreviviente `/^\d+$/ -> /\d+$/`**).
+    5. `"12345a67890"` (`11` chars, no numérico en el medio).
+    6. `"12345 67890"` (`11` chars, espacio interno).
+    7. `"000.000.000-00"` (formato con puntuación no numérica).
+
+- **Revalidación (después de la corrección):** **`PASS` (`7/7` tests) + `100%` Mutación en `adminLoginSchema`**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-003"`):** `7 passed | 17 skipped (24)` en `66 ms` (`responseTime`: `6.91 ms`, `0.97 ms`, `0.73 ms`, `0.44 ms`, `0.93 ms`, `0.58 ms`, `0.45 ms`).
+  - **StrykerJS (`npx.cmd stryker run -m "src/contracts/users/user-login-schema.ts"`):** subió de `70.00%` (`7/10`) a **`80.00%` (`8/10` muertos, `2` sobrevivientes)** en `38 s`:
+    - El mutante `[Survived] Regex` de la línea 11 fue **matado** por `"a1234567890"`, logrando **`100%` (`8/8`) de los mutantes de `adminLoginSchema`** eliminados.
+    - Los únicos `2` mutantes restantes del archivo pertenecen a `userLoginSchema` (`POST /auth` de conductores, líneas 3 y 5, fuera del alcance de `TC-CORE-003`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/contracts/users/user-login-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`48/48` tests en verde** (`5.47 s`), cobertura global `34.49% Stmts | 25.33% Branch | 24.49% Funcs | 34.53% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

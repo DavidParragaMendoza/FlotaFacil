@@ -367,32 +367,53 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			expect(body.message).toContain("password");
 		});
 
-		it("TC-CORE-003: CPF con longitud o formato inválido (POST /admin/auth -> 400)", async () => {
-			const invalidCpfs = [
-				"1234567890", // 10 caracteres (menor al mínimo de 11)
-				"123456789012", // 12 caracteres (mayor al máximo de 11)
-				"1234567890a", // 11 caracteres con caracter no numérico
-				"000.000.000-00", // Formato con puntuación no numérica
-			];
+		it.each([
+			{
+				label: "frontera inferior - 10 dígitos",
+				cpf: "1234567890",
+			},
+			{
+				label: "frontera superior - 12 dígitos",
+				cpf: "123456789012",
+			},
+			{
+				label: "11 chars - no numérico al final",
+				cpf: "1234567890a",
+			},
+			{
+				label: "11 chars - no numérico al inicio (mata mutante regex ^)",
+				cpf: "a1234567890",
+			},
+			{
+				label: "11 chars - no numérico en el medio",
+				cpf: "12345a67890",
+			},
+			{
+				label: "11 chars - espacio interno",
+				cpf: "12345 67890",
+			},
+			{
+				label: "formato con puntuación no numérica",
+				cpf: "000.000.000-00",
+			},
+		])("TC-CORE-003 ($label): rechaza CPF '$cpf' con 400 sin emitir token", async ({
+			cpf,
+		}) => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/admin/auth",
+				payload: {
+					cpf,
+					password: "123456",
+				},
+			});
 
-			for (const cpf of invalidCpfs) {
-				const response = await app.inject({
-					method: "POST",
-					url: "/admin/auth",
-					payload: {
-						cpf,
-						password: "123456",
-					},
-				});
+			expect(response.statusCode).toBe(400);
 
-				expect(response.statusCode).toBe(400);
-
-				const body = response.json();
-				expect(body).not.toHaveProperty("token");
-				expect(body).toHaveProperty("message");
-				expect(body.message).toContain("cpf");
-			}
-
+			const body = response.json();
+			expect(body).not.toHaveProperty("token");
+			expect(body).toHaveProperty("message");
+			expect(body.message).toContain("cpf");
 			expect(findUserAdminByCpf).not.toHaveBeenCalled();
 		});
 
