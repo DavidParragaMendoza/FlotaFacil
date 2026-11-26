@@ -130,7 +130,7 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
 | 9 | `TC-CORE-010` | Veículos | `RF-03` | Enum e tipos inválidos | **Auditado y Aprobado (`PASS` + Aislamiento + `100%` Mutación)** |
 | 10 | `TC-CORE-011` | Veículos | `RF-03` | Lista de veículos disponíveis por data | **Auditado y Aprobado (`PASS` + `USER`/`ADMIN` + `100%` Mutación)** |
 | 11 | `TC-CORE-012` | Veículos | `RF-03` | Atualizar e excluir veículo | **Auditado y Aprobado (`PASS` + Paso 3 `GET` + `100%` Mutación)** |
-| 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | Pendiente de auditoría individual |
+| 12 | `TC-CORE-013` | Solicitações | `RF-04` | Criar solicitação própria válida | **Auditado y Aprobado (`PASS` + `approvedBy: null` + `100%` Mutación)** |
 | 13 | `TC-CORE-014` | Solicitações | `RF-04` | Campos obrigatórios vazios | Pendiente de auditoría individual |
 
 ---
@@ -744,4 +744,58 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
     - `src/use-cases/vehicles/delete-vehicle.ts`: subió de `71.42% / 50%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - **Directorio completo `src/use-cases/vehicles/`:** **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`80/80` tests en verde** (`5.94 s`), cobertura global `36.34% Stmts | 28.43% Branch | 26.51% Funcs | 36.18% Lines`.
+  - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+### 12. `TC-CORE-013` — Crear solicitud propia válida
+
+#### 12.1 Caso de Teste
+- **ID Oficial (`Casos de Teste — SIF.pdf`):** `TC-CORE-013`
+- **Módulo:** Solicitações
+- **Requisito / US:** `RF-04` — Usuario conductor autenticado crea una solicitud de vehículo propia con estado inicial `PENDING`, auditoría y disparo de notificación a administradores.
+- **Endpoint y Escenario:** `POST /me/requests` con `USER JWT` y payload válido (`vehicleId`, `predictedStartDate`, `predictedEndDate`, `destination`, `reason`), más pruebas de contrato `strictObject` (`status: "APPROVED"` rechazado) y todas las guardias de dominio de `createMyRequestUseCase` (`404`/`400`).
+- **Precondiciones (PDF):** Vehículo disponible (`AVAILABLE`); `USER JWT` válido.
+- **Archivo de prueba:** `core-service/tests/david-core.spec.ts` (líneas 1375–1645).
+- **Código bajo prueba:** `core-service/src/use-cases/requests/create-my-request.ts`, `core-service/src/contracts/requests/create-my-request-schema.ts`, `core-service/src/contracts/requests/my-request-response-schema.ts`, `core-service/src/routes/request-router.ts` (`POST /me/requests`), `core-service/src/domains/requests/errors.ts`.
+
+#### 12.2 Tipo de Caso & Criterio Usado
+- **Nivel real de prueba:** Prueba de **componente HTTP** sobre Fastify real (`app.inject` + Zod + `@fastify/jwt` + `setErrorHandler` reales) combinada con **pruebas unitarias defensivas** directas sobre `createMyRequestUseCase(...)` para la guardia de fechas que Zod intercepta en HTTP. Dependencias simuladas con `vi.mock`: `@/domains/users/db/repository` (`findUserById`), `@/domains/vehicles/db/repository` (`findById`), `@/domains/requests/db/repository` (`insertRequestWithScheduleChecks`), `@/use-cases/audit-log-service` (`createAuditLog`), `@/use-cases/notification-service` (`notifyAdminsAboutNewRequest`) y `@/messaging/*` (RabbitMQ). *(Límite explícito: valida la invocación exacta de `notifyAdminsAboutNewRequest(REQUEST_ID)` y `createAuditLog`, **no** la publicación AMQP real en RabbitMQ ni el bloqueo transaccional en PostgreSQL).*
+- **Categoría:** `happy path` + `boundary` (`end === start`, `end < start`) + `special-input` (`strictObject` contra manipulación de `status`) + `failure` (entidades inexistentes `404`, vehículo en mantenimiento `400`, conflictos de agenda `vehicle`/`driver` `400`).
+- **Criterios y Técnicas Aplicadas:**
+  - **Validación de Contrato (`createMyRequestSchema` / `myRequestResponseSchema`):** verificar `status: "PENDING"`, `approvedBy: null`, datos embebidos del vehículo y rechazo de campos no permitidos (`status: "APPROVED"`).
+  - **Partición de Equivalencia Negativa y Aislamiento de Guardias:** cubrir cada causa de rechazo de negocio de forma separada (distinguiendo `conflict: "driver"` con `request` presente frente a retorno `{}` sin `request`).
+  - **Criterio de Cobertura de Ramas (V8) y Mutación (StrykerJS):** alcanzar `100%` de cobertura y `100%` de mutation score en `src/use-cases/requests/create-my-request.ts`.
+
+#### 12.3 Resultado Esperado
+- Conforme a `Casos de Teste — SIF.pdf`:
+  - `POST /me/requests` responde `HTTP 201` con `status: "PENDING"`, `approvedBy: null`, `userId` del token, `vehicleId` y objeto `vehicle`.
+  - Invoca `findUserById(USER_ID)`, `findVehicleById(VEHICLE_ID)`, `insertRequestWithScheduleChecks(...)` con `status: "PENDING"`, `createAuditLog` (`REQUEST.CREATED`) y `notifyAdminsAboutNewRequest(REQUEST_ID)`.
+  - Campos extra (`status: "APPROVED"`) son rechazados con `HTTP 400` sin consultar repositorios.
+  - Guardias de dominio rechazan adecuadamente (`404` usuario/vehículo no encontrado; `400` vehículo en mantenimiento, conflicto de vehículo, conflicto de conductor, retorno sin `request` y período `end <= start`) sin auditar ni notificar.
+
+#### 12.4 Resultado Obtenido
+- **Fecha de ejecución:** `2026-11-26`
+- **Evaluación Inicial (antes de corregir):** **`PASS` parcial / `MUTANTE SOBREVIVIENTE` (`42.86%` Mutación) y ramas sin cubrir**
+  - **Vitest aislado inicial (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-013"`):** `1 passed | 55 skipped (56)` en `81 ms` (`responseTime: 12.46 ms`).
+  - **Cobertura V8 inicial (`src/use-cases/requests/create-my-request.ts`):** `65% Stmts | 50% Branch | 100% Funcs | 65% Lines` (sin cubrir: `30, 36, 42, 46, 60, 64, 68`).
+  - **StrykerJS inicial (`npx.cmd stryker run -m "src/use-cases/requests/create-my-request.ts"`):** **`42.86%` total / `64.29%` covered** (`42` mutantes: `18` muertos, **`10` sobrevivientes**, **`14` sin cobertura**, `0` errores; `49 s`).
+  - **Debilidades detectadas:**
+    1. No verificaba explícitamente `approvedBy: null` ni las llamadas con IDs exactos a `findUserById`/`findVehicleById`.
+    2. No probaba el rechazo de `strictObject` ante un intento de inyectar `status: "APPROVED"`.
+    3. Dejaba descubiertas las 7 ramas de error/conflicto de `create-my-request.ts` (`24` mutantes sin matar).
+
+- **Diagnóstico y Corrección Aplicada:**
+  - Se amplió `TC-CORE-013` en `core-service/tests/david-core.spec.ts` (de `1` a **`10` pruebas**):
+    1. Se añadieron en el happy path las aserciones `approvedBy: null`, `findUserById(USER_ID)` y `findVehicleById(VEHICLE_ID)`.
+    2. Se añadió prueba de `strictObject` rechazando `status: "APPROVED"` (`400`) sin tocar repositorios.
+    3. Se añadieron **6 pruebas HTTP de mutación** cubriendo: usuario inexistente (`404`), vehículo inexistente (`404`), vehículo `MAINTENANCE` (`400`), conflicto `"vehicle"` (`400`), conflicto `"driver"` con `request` presente (`400`, aislando la rama `result.conflict === "driver"` del fallback `!result.request`) y retorno vacío `{}` (`400`).
+    4. Se añadió bloque `it.each` de **2 pruebas unitarias defensivas** sobre `createMyRequestUseCase` (`end === start` y `end < start`) verificando `InvalidRequestPeriodError`.
+
+- **Revalidación (después de la corrección):** **`PASS` (`10/10` tests) + `100.00%` Mutation Score y `100%` Cobertura**
+  - **Vitest aislado (`npx.cmd vitest run tests/david-core.spec.ts -t "TC-CORE-013"`):** `10 passed | 55 skipped (65)` en `121 ms`.
+  - **StrykerJS (`npx.cmd stryker run -m "src/use-cases/requests/create-my-request.ts"`):** subió de `42.86%` a **`100.00%` total / `100.00%` covered** (`42/42` muertos, `0` sobrevivientes, `0` sin cobertura, `0` errores; `1 min 8 s`).
+  - **Cobertura V8 (`npm.cmd run test:coverage`):**
+    - `src/use-cases/requests/create-my-request.ts`: subió de `65% / 50%` a **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
+    - Suite completa: `2 passed (2)` archivos, **`89/89` tests en verde** (`6.23 s`), cobertura global `36.91% Stmts | 29.98% Branch | 26.51% Funcs | 36.75% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).

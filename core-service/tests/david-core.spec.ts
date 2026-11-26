@@ -98,6 +98,7 @@ import { VEHICLE_STATUSES } from "@/domains/vehicles/status";
 import { authorize } from "@/hooks/authorize";
 import { createAuditLog } from "@/use-cases/audit-log-service";
 import { notifyAdminsAboutNewRequest } from "@/use-cases/notification-service";
+import { createMyRequestUseCase } from "@/use-cases/requests/create-my-request";
 import { fetchAvailableVehicles } from "@/use-cases/vehicles/fetch-available-vehicles";
 
 const ADMIN_ID = "11111111-1111-4111-8111-111111111111";
@@ -1393,6 +1394,8 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 			});
 
 			expect(response.statusCode).toBe(201);
+			expect(findUserById).toHaveBeenCalledWith(USER_ID);
+			expect(findVehicleById).toHaveBeenCalledWith(VEHICLE_ID);
 			expect(insertRequestWithScheduleChecks).toHaveBeenCalledWith({
 				userId: USER_ID,
 				vehicleId: VEHICLE_ID,
@@ -1408,6 +1411,7 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				id: REQUEST_ID,
 				userId: USER_ID,
 				vehicleId: VEHICLE_ID,
+				approvedBy: null,
 				status: "PENDING",
 				destination: "Campus Pau dos Ferros",
 				reason: "Visita técnica institucional",
@@ -1424,6 +1428,220 @@ describe("Casos de Prueba core-service — David Párraga", () => {
 				performedBy: USER_ID,
 			});
 			expect(notifyAdminsAboutNewRequest).toHaveBeenCalledWith(REQUEST_ID);
+		});
+
+		it("TC-CORE-013 (contrato strictObject): rechaza campo extra status=APPROVED con 400 sin persistir", async () => {
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+					status: "APPROVED",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(findUserById).not.toHaveBeenCalled();
+			expect(findVehicleById).not.toHaveBeenCalled();
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - usuario no encontrado): responde 404 sin consultar vehículo ni insertar", async () => {
+			vi.mocked(findUserById).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Usuário não encontrado" });
+			expect(findVehicleById).not.toHaveBeenCalled();
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - vehículo no encontrado): responde 404 sin insertar ni notificar", async () => {
+			vi.mocked(findUserById).mockResolvedValue(makeDriverUser());
+			vi.mocked(findVehicleById).mockResolvedValue(undefined);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(404);
+			expect(response.json()).toEqual({ message: "Veículo não encontrado" });
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - vehículo en mantenimiento): responde 400 VehicleNotAvailableError", async () => {
+			vi.mocked(findUserById).mockResolvedValue(makeDriverUser());
+			vi.mocked(findVehicleById).mockResolvedValue(
+				makeVehicle({ status: "MAINTENANCE" }),
+			);
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message: "Este veículo não está disponível para solicitações.",
+			});
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - conflicto de agenda del vehículo): responde 400 VehicleAlreadyScheduledError", async () => {
+			vi.mocked(findUserById).mockResolvedValue(makeDriverUser());
+			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
+			vi.mocked(insertRequestWithScheduleChecks).mockResolvedValue({
+				conflict: "vehicle",
+			});
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message:
+					"Este veículo já possui uma solicitação ou rota neste horário. Escolha outro veículo ou outro horário.",
+			});
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - conflicto de agenda del conductor): responde 400 DriverScheduleConflictError", async () => {
+			vi.mocked(findUserById).mockResolvedValue(makeDriverUser());
+			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
+			vi.mocked(insertRequestWithScheduleChecks).mockResolvedValue({
+				conflict: "driver",
+				request: makeRequest(),
+			});
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message:
+					"Você já possui uma solicitação ou rota para este horário. Escolha outro horário.",
+			});
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it("TC-CORE-013 (mutación - retorno sin request ni conflict): responde 400 DriverScheduleConflictError", async () => {
+			vi.mocked(findUserById).mockResolvedValue(makeDriverUser());
+			vi.mocked(findVehicleById).mockResolvedValue(makeVehicle());
+			vi.mocked(insertRequestWithScheduleChecks).mockResolvedValue({});
+
+			const response = await app.inject({
+				method: "POST",
+				url: "/me/requests",
+				headers: getDriverAuthHeader(),
+				payload: {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate: "2026-03-15T08:00:00.000Z",
+					predictedEndDate: "2026-03-15T12:00:00.000Z",
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				},
+			});
+
+			expect(response.statusCode).toBe(400);
+			expect(response.json()).toEqual({
+				message:
+					"Você já possui uma solicitação ou rota para este horário. Escolha outro horário.",
+			});
+			expect(createAuditLog).not.toHaveBeenCalled();
+			expect(notifyAdminsAboutNewRequest).not.toHaveBeenCalled();
+		});
+
+		it.each([
+			{
+				label: "predictedEndDate igual a predictedStartDate",
+				predictedStartDate: new Date("2026-03-15T12:00:00.000Z"),
+				predictedEndDate: new Date("2026-03-15T12:00:00.000Z"),
+			},
+			{
+				label: "predictedEndDate anterior a predictedStartDate",
+				predictedStartDate: new Date("2026-03-15T12:00:00.000Z"),
+				predictedEndDate: new Date("2026-03-15T08:00:00.000Z"),
+			},
+		])("TC-CORE-013 (mutación defensiva caso de uso - $label): createMyRequestUseCase lanza InvalidRequestPeriodError", async ({
+			predictedStartDate,
+			predictedEndDate,
+		}) => {
+			await expect(
+				createMyRequestUseCase(USER_ID, {
+					vehicleId: VEHICLE_ID,
+					predictedStartDate,
+					predictedEndDate,
+					destination: "Campus Pau dos Ferros",
+					reason: "Visita técnica institucional",
+				}),
+			).rejects.toThrow("A data final deve ser maior que a data inicial");
+			expect(findUserById).not.toHaveBeenCalled();
+			expect(findVehicleById).not.toHaveBeenCalled();
+			expect(insertRequestWithScheduleChecks).not.toHaveBeenCalled();
 		});
 
 		it("TC-CORE-014: Campos obligatorios vacíos en solicitud (POST /me/requests -> 400)", async () => {
