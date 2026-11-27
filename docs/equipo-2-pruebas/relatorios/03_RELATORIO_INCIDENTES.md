@@ -37,7 +37,7 @@ Este documento registra los incidentes, discrepancias de contrato y defectos enc
 - **Verificación por regresión (sin romper tests del equipo):**
   - `ai-service/tests/test_reports_ai.py` (`pytest -v --cov=app`): **`7/7 passed`** (`93%` cobertura global), incluyendo los 3 nuevos tests de `POST /reports/fleet` (`200`, `422` sin llamar a IA y `502` ante caída de IA).
   - `core-service` (`npx vitest run && npx tsc --noEmit && npx biome check`): **`121 passed` (`0 failed`)** en toda la suite integrada (David + Sara + Andy, incluyendo el nuevo test de regresión en `tests/andy-ai-reports.spec.ts`), `0` errores de TypeScript y `0` errores de Biome.
-- **Evidencia:** [evidencias/TC-AI.txt](../evidencias/TC-AI.txt).
+- **Evidencia:** [evidencias/TC-AI.txt](../../../evidencias/TC-AI.txt).
 
 ---
 
@@ -52,9 +52,9 @@ Este documento registra los incidentes, discrepancias de contrato y defectos enc
   - En `tracking-service/internal/messaging/rabbitmq.go`: refactorizado `RabbitMQPublisher` con protección concurrente (`sync.Mutex`), abstracción interna `amqpSession` (`IsClosed()`, `PublishWithContext()`, `Close()`) y método `reconnectLocked()`.
   - En `PublishTracking`: si la sesión está cerrada o si `PublishWithContext` falla por caída de canal/conexión, el publicador reconecta automáticamente una vez y reintenta la publicación. Si el broker sigue realmente caído, devuelve error para que el handler mantenga el contrato `HTTP 503 ("failed to publish tracking data")` verificado en `TC-TRACK-004`.
 - **Verificación por regresión:**
-  - Nuevo archivo de pruebas [tracking-service/internal/messaging/rabbitmq_test.go](../tracking-service/internal/messaging/rabbitmq_test.go) con 5 tests unitarios (publicación normal en `tracking`/`tracking.updated`, reconexión automática tras canal cerrado por heartbeat, reconexión y reintento tras fallo mid-flight, error controlado cuando el broker sigue offline y `amqpURL`).
+  - Nuevo archivo de pruebas [tracking-service/internal/messaging/rabbitmq_test.go](../../../tracking-service/internal/messaging/rabbitmq_test.go) con 5 tests unitarios (publicación normal en `tracking`/`tracking.updated`, reconexión automática tras canal cerrado por heartbeat, reconexión y reintento tras fallo mid-flight, error controlado cuando el broker sigue offline y `amqpURL`).
   - Ejecución completa `go test -v -coverpkg=./internal/... ./...`: **100% PASS** (`internal/messaging` + `internal/server`); la cobertura global de `./internal/...` subió de `61.3%` a **`68.1%`** (`reconnectLocked`: `100%`, `PublishTracking`: `82.4%`, `internal/server`: `100%`, `internal/handlers`: `92.6%–100%`).
-- **Evidencia:** [evidencias/TC-TRACK.txt](../evidencias/TC-TRACK.txt).
+- **Evidencia:** [evidencias/TC-TRACK.txt](../../../evidencias/TC-TRACK.txt).
 
 ---
 
@@ -65,4 +65,4 @@ Este documento registra los incidentes, discrepancias de contrato y defectos enc
 - **Severidad:** **Baja**
 - **Situación y resolución:**
   - No constituye un bug del código fuente: el sistema implementa `POST /admin/auth` en `core-service` y renderiza el Dashboard en `/` en `admin-app` (en lugar de `/auth/login` y `/dashboard` mencionados en el plan preliminar). Se mantuvieron las rutas reales de producción intactas para preservar compatibilidad con todo el equipo y se alinearon la documentación y las suites de Playwright y k6.
-- **Evidencia:** [evidencias/00-reconocimiento.md](../evidencias/00-reconocimiento.md).
+- **Evidencia:** [evidencias/00-reconocimiento.md](../../../evidencias/00-reconocimiento.md).
