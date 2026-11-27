@@ -3,7 +3,8 @@
 - **Responsable:** David Párraga
 - **Rama Git:** `test/david-core-auth-fleet`
 - **Commit Base Auditado:** `b2d6811`
-- **Fecha de Inicio de Auditoría (Fase 0):** `2026-11-26`
+- **Commit Base de Corrida Final (Fase 2):** `bae7911`
+- **Fecha de Inicio y Cierre de Auditoría:** `2026-11-26` (Fase 0, Fase 1 — 13/13 casos, y Fase 2 — Validación Global completadas)
 - **Fuentes Oficiales Rectoras:**
   - `Casos de Teste — SIF.pdf` (36 casos planeados — fuente oficial de IDs, roteiros y resultados esperados).
   - `Plano de Teste — SIF (Sistema Integrado de Frotas).pdf` (criterios metodológicos, cobertura mínima >= 80%, mutación y trazabilidad).
@@ -851,3 +852,75 @@ Cada uno de los 13 casos será auditado uno a la vez y documentado siguiendo exa
     - `src/contracts/requests/create-my-request-schema.ts`: **`100% Stmts | 100% Branch | 100% Funcs | 100% Lines`**.
     - Suite completa: `2 passed (2)` archivos, **`96/96` tests en verde** (`5.95 s`), cobertura global `36.91% Stmts | 29.98% Branch | 26.51% Funcs | 36.75% Lines`.
   - **Checks estáticos y build:** `npx.cmd tsc --noEmit` (`0` errores), `npm.cmd run lint` (`147` archivos, `0` errores), `npm.cmd run build` (`exit 0`).
+
+---
+
+## 6. Consolidación Final y Validación Global (Fase 2)
+
+### 6.1 Identificación de la Corrida Única Final
+- **Fecha y hora local:** `2026-11-26` (`22:10`–`22:15`, `-03:00`)
+- **Rama Git:** `test/david-core-auth-fleet`
+- **Commit verificado:** `bae7911` (`test(requests): audit TC-CORE-014, isolate validation fields, kill schema refine mutants and update report`)
+- **Entorno:** Windows / PowerShell, Node + Vitest `v4.1.10`, `@vitest/coverage-v8`, StrykerJS `v10.1.1`, Biome `check`, TypeScript (`tsc`).
+
+| Verificación | Comando Ejecutado (`core-service/`) | Resultado Observado (Corrida Única) |
+|---|---|---|
+| Suite completa | `npm.cmd run test` (`vitest run`) | **PASS** — `2` archivos (`tests/use-cases.spec.ts` `24/24`, `tests/david-core.spec.ts` `72/72`), **`96/96` tests** en verde (`9.59 s`), `stderr` limpio. |
+| Cobertura V8 | `npm.cmd run test:coverage` (`vitest run --coverage`) | **PASS** — **`96/96` tests** (`4.60 s`). **15/15 archivos objetivo al `100% Stmts \| 100% Branch \| 100% Funcs \| 100% Lines`**. Global `core-service`: `36.91% Stmts \| 29.98% Branch \| 26.51% Funcs \| 36.75% Lines`. |
+| Mutación global | `npm.cmd run test:mutation` (`stryker run`) | **PASS** — **`98.92%` total / `98.92%` covered** sobre los `15` archivos objetivo (`186` instrumentados: **`183` muertos**, `0` timeout, `2` sobrevivientes fuera de `adminLoginSchema`, `0` sin cobertura, `1` runtime error en `authorize.ts` excluido del denominador; `4 min 13 s`). |
+| Chequeo de tipos | `npx.cmd tsc --noEmit` | **PASS** — `0` errores (`exit code 0`). |
+| Linter y formato | `npm.cmd run lint` (`biome check`) | **PASS** — `147` archivos verificados en `589 ms`, `0` errores (`exit code 0`). |
+| Build producción | `npm.cmd run build` (`tsc --project tsconfig.build.json && tsc-alias`) | **PASS** — Compilación limpia (`exit code 0`). |
+
+### 6.2 Evolución de Cobertura V8 y Mutation Score (Fase 0 vs. Fase 2)
+
+Todos los **15 módulos objetivo** del alcance de David Párraga cumplen y superan el criterio mínimo de `>= 80%` definido en `Plano de Teste — SIF (Sistema Integrado de Frotas).pdf`:
+
+| Archivo Objetivo (`src/...`) | Cobertura V8 Inicial (Fase 0) | Cobertura V8 Final (Fase 2) | StrykerJS Final (`%` / Muertos) |
+|---|---|---|---|
+| `contracts/users/user-login-schema.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`80.00%`** (`8/10`; `8/8 = 100%` en `adminLoginSchema`) |
+| `contracts/users/create-user-schema.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`9/9`) |
+| `contracts/vehicles/register-vehicle-request-schema.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`1/1`) |
+| `contracts/requests/create-my-request-schema.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`12/12`) |
+| `hooks/verify-jwt.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`5/5`) |
+| `hooks/authorize.ts` | `66.66% / 50% / 100% / 66.66%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`13/13`, `1` runtime error) |
+| `use-cases/authenticate-admin.ts` | `77.77% / 50% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`12/12`) |
+| `use-cases/users/create-user.ts` | `88.88% / 83.33% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`11/11`) |
+| `use-cases/users/fetch-user-by-id.ts` | `0% / 0% / 0% / 0%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`6/6`) |
+| `use-cases/vehicles/register-vehicle.ts` | `100% / 100% / 100% / 100%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`6/6`) |
+| `use-cases/vehicles/fetch-vehicles.ts` | `0% / 100% / 0% / 0%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`2/2`) |
+| `use-cases/vehicles/fetch-available-vehicles.ts` | `73.33% / 58.33% / 83.33% / 78.57%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`28/28`) |
+| `use-cases/vehicles/update-vehicle.ts` | `72.72% / 70% / 100% / 72.72%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`18/18`) |
+| `use-cases/vehicles/delete-vehicle.ts` | `71.42% / 50% / 100% / 71.42%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`10/10`) |
+| `use-cases/requests/create-my-request.ts` | `65% / 50% / 100% / 65%` | **`100% / 100% / 100% / 100%`** | **`100.00%`** (`42/42`) |
+| **Resumen por capa (StrykerJS)** | *Sin configuración previa* | **15/15 archivos al `100%` V8** | **`use-cases`: `100.00%` (`135/135`) \| `hooks`: `100.00%` (`18/18`) \| `contracts`: `93.75%` (`30/32`) \| Total: `98.92%`** |
+
+### 6.3 Matriz Consolidada de Trazabilidad (`Requisito → Caso → Ejecución → Commit`)
+
+| Fase / Orden | Requisito | ID Oficial (`Casos de Teste — SIF.pdf`) | Tests en `david-core.spec.ts` | Resultado Final | Commit SHA |
+|---|---|---|---|---|---|
+| Fase 0 | Infra QA | Setup V8 + StrykerJS + fix `stderr` en `use-cases.spec.ts` | `13` base (`37` totales) | **PASS** | `fe3df0b` |
+| 1 | `RF-01` | `TC-CORE-001` — Login de administrador válido | `3` | **PASS** (`100%` V8 / `100%` Mut.) | `addfa60` |
+| 2 | `RF-01` | `TC-CORE-002` — Campos de login vazios | `4` | **PASS** (aislamiento completo) | `4c5218e` |
+| 3 | `RF-01` | `TC-CORE-003` — CPF com comprimento/formato inválido | `7` | **PASS** (`100%` en `adminLoginSchema`, incidente `b2d6811` documentado) | `ed52948` |
+| — | `RF-01` | *(`TC-CORE-004` no existe; fila 4 del PDF es `TC-ADMIN-001`)* | — | Fuera de alcance `core-service` (Playwright UI `:3000`) | — |
+| 4 | `RF-02` | `TC-CORE-005` — Recurso protegido sem JWT (+ RBAC `403`) | `6` | **PASS** (`100%` V8 / `100%` Mut. hooks) | `a8eb728` |
+| 5 | `RF-01` | `TC-CORE-006` — Criar usuário com dados válidos (+ `GET :id`) | `4` | **PASS** (`100%` V8 / `100%` Mut.) | `2fdf224` |
+| 6 | `RF-01` | `TC-CORE-007` — E-mail inválido e campos obrigatórios | `6` | **PASS** (`100%` V8 / `100%` Mut., incidente `b2d6811` documentado) | `2195613` |
+| 7 | `RF-03` | `TC-CORE-008` — Registrar veículo válido (+ `GET /admin/vehicles`) | `1` | **PASS** (`100%` V8 / `100%` Mut.) | `d726667` |
+| 8 | `RF-03` | `TC-CORE-009` *(PDF: `TC-CORE-09`)* — Placa duplicada | `1` | **PASS** (`100%` V8 / `100%` Mut., conteo invariable) | `e7932b0` |
+| 9 | `RF-03` | `TC-CORE-010` — Enum e tipos inválidos | `5` | **PASS** (`100%` V8 / `100%` Mut., aislamiento) | `a70b7a5` |
+| 10 | `RF-03` | `TC-CORE-011` — Lista de veículos disponíveis por data | `11` | **PASS** (`100%` V8 / `100%` Mut., `USER`/`ADMIN`) | `6e8cfbe` |
+| 11 | `RF-03` | `TC-CORE-012` — Atualizar e excluir veículo (+ Paso 3 `GET`) | `6` | **PASS** (`100%` V8 / `100%` Mut., todo `use-cases/vehicles` al `100%`) | `59d7d20` |
+| 12 | `RF-04` | `TC-CORE-013` — Criar solicitação própria válida | `10` | **PASS** (`100%` V8 / `100%` Mut., `approvedBy: null`, `strictObject`) | `046f116` |
+| 13 | `RF-04` | `TC-CORE-014` — Campos obrigatórios vazios en solicitud | `8` | **PASS** (`100%` V8 / `100%` Mut. `.refine`, aislamiento) | `bae7911` |
+| **Total** | **`RF-01`..`RF-04`** | **13/13 casos oficiales auditados** | **`72` en `david-core.spec.ts` (`96` totales)** | **`96/96 PASS` \| `100%` V8 objetivo \| `98.92%` StrykerJS** | **Ver Fase 2** |
+
+### 6.4 Alcance Real, Limitaciones y Riesgos Abiertos (Transparencia Metodológica)
+1. **Pruebas de componente HTTP / unitarias con mocks vs. integración real en Docker:**
+   - **Qué sí está demostrado con evidencia automatizada:** Validación y serialización Zod en rutas reales de Fastify (`app.inject`), firma/verificación de JWT (`@fastify/jwt`), comparación de hashes `bcryptjs`, control de acceso RBAC (`verifyJwt` + `authorize`), mapeo de errores (`setErrorHandler`), reglas de negocio completas de todos los `use-cases` auditados y contratos de invocación hacia repositorios, auditoría y notificaciones.
+   - **Qué queda fuera de esta suite y corresponde a integración con Docker Compose:** Persistencia SQL real y restricciones `UNIQUE`/transacciones `SELECT ... FOR UPDATE` en PostgreSQL, publicación/consumo efectivo de mensajes en RabbitMQ, almacenamiento en MinIO y flujo E2E en navegador (`TC-ADMIN-001` en `:3000`).
+2. **Explicación de los `2` mutantes sobrevivientes residuales (`98.92%` global):**
+   - Ambos se encuentran en `userLoginSchema` (`src/contracts/users/user-login-schema.ts`, líneas 3–5: login de conductor por email/contraseña), que cohabita el mismo archivo que `adminLoginSchema` (`TC-CORE-001..003`). `adminLoginSchema` mantiene **`100%` (`8/8` mutantes muertos)**.
+3. **Riesgo de entorno CI Linux (`core-service/biome.json`):**
+   - `core-service/biome.json` conserva `"lineEnding": "crlf"` introducido en `b2d6811`. En Windows `npm.cmd run lint` pasa sin errores (`147` archivos), pero se recomienda alinear saltos de línea (por ejemplo mediante `.gitattributes` o `"lineEnding": "lf"`) si el workflow `ubuntu-latest` de GitHub Actions reporta discrepancias de fin de línea.
