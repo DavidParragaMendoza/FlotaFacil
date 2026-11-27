@@ -69,6 +69,14 @@ vi.mock("@/services/ai-report-service", () => ({
 	requestRouteReportFromAiService: vi.fn(),
 }));
 
+vi.mock("@/services/locationiq-static-map-service", () => ({
+	generateTrackingStaticMap: vi.fn(),
+}));
+
+vi.mock("@/minio/save-tracking-map", () => ({
+	saveTrackingMapToMinio: vi.fn(),
+}));
+
 vi.mock("@/use-cases/audit-log-service", () => ({
 	createAuditLog: vi.fn(),
 }));
@@ -127,7 +135,9 @@ import {
 	insertVehicle,
 	updateVehicle as updateVehicleRepository,
 } from "@/domains/vehicles/db/repository";
+import { saveTrackingMapToMinio } from "@/minio/save-tracking-map";
 import { requestRouteReportFromAiService } from "@/services/ai-report-service";
+import { generateTrackingStaticMap } from "@/services/locationiq-static-map-service";
 import { createAuditLog } from "@/use-cases/audit-log-service";
 import { authenticate } from "@/use-cases/authenticate";
 import { authenticateAdmin } from "@/use-cases/authenticate-admin";
@@ -152,6 +162,7 @@ import { startRouteUseCase } from "@/use-cases/routes/start-route";
 import { createTrackUseCase } from "@/use-cases/tracks/create-track";
 import { fetchRouteTracksUseCase } from "@/use-cases/tracks/fetch-route-tracks";
 import { createUserUseCase } from "@/use-cases/users/create-user";
+import { fetchUsersUseCase } from "@/use-cases/users/fetch-users";
 import { updateUserUseCase } from "@/use-cases/users/update-user";
 import { registerVehicle } from "@/use-cases/vehicles/register-vehicle";
 import { updateVehicle } from "@/use-cases/vehicles/update-vehicle";
@@ -195,7 +206,7 @@ function makeVehicle(overrides = {}) {
 		odometer: 1200,
 		imageUrl: null,
 		status: VEHICLE_STATUSES[0],
-		type: "CAR",
+		type: "CAR" as const,
 		createdAt,
 		updatedAt,
 		...overrides,
@@ -413,7 +424,6 @@ describe("usuarios", () => {
 
 	it("retorna usuarios sem passwordHash ao listar", async () => {
 		vi.mocked(fetchUsers).mockResolvedValue([makeUser()]);
-		const { fetchUsersUseCase } = await import("@/use-cases/users/fetch-users");
 
 		const result = await fetchUsersUseCase();
 
@@ -767,6 +777,14 @@ describe("tracks e relatorios", () => {
 	it("cria track apenas quando a rota existe", async () => {
 		vi.mocked(findRouteById).mockResolvedValue(makeRoute());
 		vi.mocked(insertTrack).mockResolvedValue(makeTrack());
+		vi.mocked(generateTrackingStaticMap).mockResolvedValue(
+			Buffer.from("mock-map-image"),
+		);
+		vi.mocked(saveTrackingMapToMinio).mockResolvedValue({
+			bucket: "sif-dev",
+			imageKey: `tracks/${ids.route}/${ids.track}.png`,
+			imageUrl: `http://localhost:9000/sif-dev/tracks/${ids.route}/${ids.track}.png`,
+		});
 
 		const result = await createTrackUseCase({
 			routeId: ids.route,

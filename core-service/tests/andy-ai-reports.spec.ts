@@ -38,7 +38,6 @@ import {
 } from "@/domains/routes/db/repository";
 import { ROUTE_STATUS } from "@/domains/routes/status";
 import { VEHICLE_STATUS } from "@/domains/vehicles/status";
-import { generateFleetReportUseCase } from "@/use-cases/reports/generate-fleet-report";
 import { generateRouteReportUseCase } from "@/use-cases/reports/generate-route-report";
 import { finishRouteUseCase } from "@/use-cases/routes/finish-route";
 
@@ -99,17 +98,12 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 			const simulatedMarkdown =
 				"# Relatório Gerado pela IA\n\nResumo completo da operação da rota.";
 
-			const fetchSpy = vi
-				.spyOn(globalThis, "fetch")
-				.mockResolvedValueOnce(
-					new Response(
-						JSON.stringify({ markdown_content: simulatedMarkdown }),
-						{
-							status: 200,
-							headers: { "Content-Type": "application/json" },
-						},
-					),
-				);
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+				new Response(JSON.stringify({ markdown_content: simulatedMarkdown }), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
 
 			vi.mocked(fetchRouteReportData).mockResolvedValueOnce({
 				route: {
@@ -123,9 +117,9 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 					createdAt: new Date("2026-11-24T09:00:00Z"),
 					updatedAt: new Date("2026-11-24T11:00:00Z"),
 				},
-				request: null,
-				user: null,
-				vehicle: null,
+				request: null as never,
+				user: null as never,
+				vehicle: null as never,
 				tracks: [],
 			});
 
@@ -163,9 +157,8 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 
 	describe("TC-AI-002 (b): routeId válido con la IA simulada devolviendo 503 -> error controlado y ningún informe parcial guardado", () => {
 		it("Cuando ai-service responde HTTP 503, generateRouteReportUseCase rechaza la operación y finishRouteUseCase NO guarda informe parcial", async () => {
-			const fetchSpy = vi
-				.spyOn(globalThis, "fetch")
-				.mockImplementation(async () =>
+			const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(
+				async () =>
 					new Response(
 						JSON.stringify({ detail: "AI upstream service unavailable (503)" }),
 						{
@@ -173,7 +166,7 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 							headers: { "Content-Type": "application/json" },
 						},
 					),
-				);
+			);
 
 			vi.mocked(fetchRouteReportData).mockResolvedValue({
 				route: {
@@ -187,9 +180,9 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 					createdAt: new Date("2026-11-24T09:00:00Z"),
 					updatedAt: new Date("2026-11-24T11:00:00Z"),
 				},
-				request: null,
-				user: null,
-				vehicle: null,
+				request: null as never,
+				user: null as never,
+				vehicle: null as never,
 				tracks: [],
 			});
 
