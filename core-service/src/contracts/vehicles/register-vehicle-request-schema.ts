@@ -7,7 +7,7 @@ export const vehicleRequestSchema = z.object({
 	model: z.string(),
 	year: z.number(),
 	odometer: z.number(),
-	imageUrl: z.string().nullable(),
+	imageUrl: z.string().nullable().optional(),
 	status: z.enum(VEHICLE_STATUSES),
 	type: z.enum(VEHICLE_TYPES),
 });

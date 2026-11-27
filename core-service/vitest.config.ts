@@ -16,5 +16,12 @@ export default defineConfig({
 		include: ["tests/**/*.spec.ts"],
 		restoreMocks: true,
 		clearMocks: true,
+		coverage: {
+			provider: "v8",
+			reporter: ["text", "json-summary", "html"],
+			reportsDirectory: "./coverage",
+			include: ["src/**/*.ts"],
+			exclude: ["src/server.ts", "src/drizzle/**", "src/**/*.d.ts"],
+		},
 	},
 });

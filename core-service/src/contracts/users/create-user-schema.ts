@@ -2,9 +2,9 @@ import { z } from "zod";
 import { USER_ROLES } from "@/domains/users/roles";
 
 export const createUserSchema = z.object({
-	name: z.string(),
+	name: z.string().min(1),
 	email: z.email(),
-	password: z.string(),
+	password: z.string().min(1),
 	cpf: z.string().min(11).max(11),
 	cnh: z.string().min(11).max(11).optional(),
 	phone: z.string().min(10).max(14),
