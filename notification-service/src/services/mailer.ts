@@ -3,8 +3,8 @@ import { env } from "@/config/env";
 
 export async function sendEmail(to: string, subject: string, text: string) {
     const transporter = nodemailer.createTransport({
-        host: '52.176.18.186',
-        port: 1025,
+        host: env.SMTP_HOST,
+        port: env.SMTP_PORT,
         secure: false
     })
 
