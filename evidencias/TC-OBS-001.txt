@@ -1,0 +1,20 @@
+﻿============================================================
+TC-OBS-001 - Verificacion de Targets Prometheus y /metrics
+Fecha: 2026-11-25 00:11:59 -03:00
+============================================================
+
+[1/2] Consultando API de Targets en Prometheus: http://localhost:9090/api/v1/targets
+Targets activos encontrados: 3 | En estado UP: 3
+  - job=core-service           instance=host.docker.internal:3333    health=up     lastError=(none)
+  - job=notification-service   instance=host.docker.internal:3331    health=up     lastError=(none)
+  - job=tracking-service       instance=host.docker.internal:8080    health=up     lastError=(none)
+
+[2/2] Verificando endpoints /metrics individuales (HTTP 200 + payload de metricas)
+  - core-service           GET http://localhost:3333/metrics    -> HTTP 200 (9112 bytes) | muestra: process_cpu_user_seconds_total 212.47241499999996
+  - tracking-service       GET http://localhost:8080/metrics    -> HTTP 200 (8679 bytes) | muestra: go_gc_duration_seconds{quantile="0"} 0.000141365
+  - notification-service   GET http://localhost:3331/metrics    -> HTTP 200 (8888 bytes) | muestra: process_cpu_user_seconds_total 121.908331
+
+============================================================
+RESULTADO TC-OBS-001: EXECUTADO COM SUCESSO (3/3 jobs UP, 3/3 /metrics HTTP 200)
+============================================================
+
