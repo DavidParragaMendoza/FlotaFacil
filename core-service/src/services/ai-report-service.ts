@@ -107,6 +107,31 @@ type AiRouteReportPayload = {
 	metadata: Record<string, unknown>;
 };
 
+type AiServiceHttpError = Error & { statusCode: number };
+
+async function parseResponseBody(response: Response): Promise<unknown> {
+	const rawText = await response.text();
+	if (!rawText) {
+		return null;
+	}
+	try {
+		return JSON.parse(rawText);
+	} catch {
+		return rawText;
+	}
+}
+
+function buildAiServiceError(
+	status: number,
+	responseBody: unknown,
+): AiServiceHttpError {
+	const error = new Error(
+		`Erro ao chamar ai-report-service: ${JSON.stringify(responseBody)}`,
+	) as AiServiceHttpError;
+	error.statusCode = status >= 500 ? 502 : status;
+	return error;
+}
+
 export async function requestFleetReportFromAiService(
 	payload: AiFleetReportPayload,
 ): Promise<GeneratedMarkdownReportResponseDTO> {
@@ -118,12 +143,10 @@ export async function requestFleetReportFromAiService(
 		body: JSON.stringify(payload),
 	});
 
-	const responseBody = await response.json();
+	const responseBody = await parseResponseBody(response);
 
 	if (!response.ok) {
-		throw new Error(
-			`Erro ao chamar ai-report-service: ${JSON.stringify(responseBody)}`,
-		);
+		throw buildAiServiceError(response.status, responseBody);
 	}
 
 	return generatedMarkdownReportResponseSchema.parse(responseBody);
@@ -140,12 +163,10 @@ export async function requestRouteReportFromAiService(
 		body: JSON.stringify(payload),
 	});
 
-	const responseBody = await response.json();
+	const responseBody = await parseResponseBody(response);
 
 	if (!response.ok) {
-		throw new Error(
-			`Erro ao chamar ai-report-service: ${JSON.stringify(responseBody)}`,
-		);
+		throw buildAiServiceError(response.status, responseBody);
 	}
 
 	return generatedRouteReportResponseSchema.parse(responseBody);

@@ -38,6 +38,7 @@ import {
 } from "@/domains/routes/db/repository";
 import { ROUTE_STATUS } from "@/domains/routes/status";
 import { VEHICLE_STATUS } from "@/domains/vehicles/status";
+import { requestFleetReportFromAiService } from "@/services/ai-report-service";
 import { generateRouteReportUseCase } from "@/use-cases/reports/generate-route-report";
 import { finishRouteUseCase } from "@/use-cases/routes/finish-route";
 
@@ -271,6 +272,47 @@ describe("TC-AI-001 & TC-AI-002 — Reportes Analíticos con IA (core-service)",
 			expect(fleetRes.statusCode).toBe(404);
 			expect(fleetRes.json()).toEqual({
 				message: "Relatório da rota ainda não foi gerado",
+			});
+
+			fetchSpy.mockRestore();
+		});
+
+		it("Regresión INC-ANDY-001: requestFleetReportFromAiService maneja HTTP 200 y errores 503 (JSON o texto plano) devolviendo statusCode 502", async () => {
+			const fleetPayload = {
+				period: { start: "2026-11-01", end: "2026-11-27" },
+				users: [],
+				vehicles: [],
+				requests: [],
+				routes: [],
+				metadata: { source: "core-service" },
+			};
+
+			const fetchSpy = vi
+				.spyOn(globalThis, "fetch")
+				.mockResolvedValueOnce(
+					new Response(
+						JSON.stringify({ markdown_content: "# Relatório da Frota" }),
+						{
+							status: 200,
+							headers: { "Content-Type": "application/json" },
+						},
+					),
+				)
+				.mockResolvedValueOnce(
+					new Response("503 Service Temporarily Unavailable", {
+						status: 503,
+						headers: { "Content-Type": "text/plain" },
+					}),
+				);
+
+			const okResult = await requestFleetReportFromAiService(fleetPayload);
+			expect(okResult.markdown_content).toBe("# Relatório da Frota");
+
+			await expect(
+				requestFleetReportFromAiService(fleetPayload),
+			).rejects.toMatchObject({
+				statusCode: 502,
+				message: expect.stringMatching(/Erro ao chamar ai-report-service/),
 			});
 
 			fetchSpy.mockRestore();

@@ -110,3 +110,48 @@ def test_tc_ai_002b_empty_ai_output_returns_502_without_partial_report():
 
         assert response.status_code == 502
         assert response.json()["detail"] == "A IA retornou um relatório vazio."
+
+
+VALID_FLEET_PAYLOAD = {
+    "period": {"start": "2026-11-01", "end": "2026-11-27"},
+    "users": [VALID_ROUTE_PAYLOAD["user"]],
+    "vehicles": [VALID_ROUTE_PAYLOAD["vehicle"]],
+    "requests": [VALID_ROUTE_PAYLOAD["request"]],
+    "routes": [VALID_ROUTE_PAYLOAD["route"]],
+    "extra_context": "Teste de regressão INC-ANDY-001",
+    "metadata": {"source": "core-service", "report_type": "fleet"},
+}
+
+
+def test_inc_andy_001_fleet_report_endpoint_returns_200():
+    """Regresión INC-ANDY-001: POST /reports/fleet ahora existe en ai-service y responde HTTP 200 con markdown."""
+    simulated_markdown = "# Relatório Consolidado da Frota\n\n- Total de veículos: 1"
+
+    with patch("app.services.openai_service.client.responses.create") as mock_create:
+        mock_create.return_value = SimpleNamespace(output_text=simulated_markdown)
+
+        response = client.post("/reports/fleet", json=VALID_FLEET_PAYLOAD)
+
+        assert response.status_code == 200
+        assert response.json() == {"markdown_content": simulated_markdown}
+        mock_create.assert_called_once()
+
+
+def test_inc_andy_001_fleet_report_invalid_payload_returns_422_without_ai_call():
+    """Regresión INC-ANDY-001: Payload inválido en POST /reports/fleet devuelve 422 sin llamar a la IA."""
+    with patch("app.services.openai_service.client.responses.create") as mock_create:
+        response = client.post("/reports/fleet", json={"vehicles": "not-a-list"})
+
+        assert response.status_code == 422
+        mock_create.assert_not_called()
+
+
+def test_inc_andy_001_fleet_report_ai_unavailable_returns_502():
+    """Regresión INC-ANDY-001: Fallo del proveedor IA en POST /reports/fleet devuelve HTTP 502."""
+    with patch("app.services.openai_service.client.responses.create") as mock_create:
+        mock_create.side_effect = OpenAIError("503 Service Unavailable")
+
+        response = client.post("/reports/fleet", json=VALID_FLEET_PAYLOAD)
+
+        assert response.status_code == 502
+        assert response.json()["detail"] == "Não foi possível gerar o relatório com a IA."

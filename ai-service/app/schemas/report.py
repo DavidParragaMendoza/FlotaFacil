@@ -68,5 +68,21 @@ class GenerateRouteReportInput(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReportPeriod(BaseModel):
+    start: Optional[str] = None
+    end: Optional[str] = None
+
+
+class GenerateFleetReportInput(BaseModel):
+    period: Optional[ReportPeriod] = None
+    users: list[ReportUser] = Field(default_factory=list)
+    vehicles: list[ReportVehicle] = Field(default_factory=list)
+    requests: list[ReportRequest] = Field(default_factory=list)
+    routes: list[ReportRoute] = Field(default_factory=list)
+
+    extra_context: Optional[str] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class GenerateRouteReportOutput(BaseModel):
     markdown_content: str
