@@ -1,9 +1,21 @@
 ﻿=== go test -v -coverpkg=./internal/... -coverprofile=coverage.out ./...
 ?   	github.com/Frota-Facil/tracking-service/cmd/api	[no test files]
 	github.com/Frota-Facil/tracking-service/internal/handlers		coverage: 0.0% of statements
-	github.com/Frota-Facil/tracking-service/internal/messaging		coverage: 0.0% of statements
+=== RUN   TestAMQPURL
+--- PASS: TestAMQPURL (0.00s)
+=== RUN   TestPublishTracking_PublishesJSONToConfiguredExchangeAndKey
+--- PASS: TestPublishTracking_PublishesJSONToConfiguredExchangeAndKey (0.00s)
+=== RUN   TestPublishTracking_INC_ANDY_002_AutoReconnectsAfterClosedChannel
+--- PASS: TestPublishTracking_INC_ANDY_002_AutoReconnectsAfterClosedChannel (0.00s)
+=== RUN   TestPublishTracking_INC_ANDY_002_ReconnectsAndRetriesOnPublishFailure
+--- PASS: TestPublishTracking_INC_ANDY_002_ReconnectsAndRetriesOnPublishFailure (0.00s)
+=== RUN   TestPublishTracking_ReturnsErrorWhenReconnectFails
+--- PASS: TestPublishTracking_ReturnsErrorWhenReconnectFails (0.00s)
+PASS
+coverage: 28.4% of statements in ./internal/...
+ok  	github.com/Frota-Facil/tracking-service/internal/messaging	1.524s	coverage: 28.4% of statements in ./internal/...
 === RUN   TestHealthHandler
---- PASS: TestHealthHandler (0.08s)
+--- PASS: TestHealthHandler (0.06s)
 === RUN   TestMetricsHandler
 --- PASS: TestMetricsHandler (0.00s)
 === RUN   TestCreateTracking
@@ -41,22 +53,28 @@
 === RUN   TestCreateTracking_TC_TRACK_004_PublisherFailure
 --- PASS: TestCreateTracking_TC_TRACK_004_PublisherFailure (0.00s)
 PASS
-coverage: 61.3% of statements in ./internal/...
-ok  	github.com/Frota-Facil/tracking-service/internal/server	(cached)	coverage: 61.3% of statements in ./internal/...
+coverage: 39.7% of statements in ./internal/...
+ok  	github.com/Frota-Facil/tracking-service/internal/server	0.344s	coverage: 39.7% of statements in ./internal/...
 
 === go tool cover -func=coverage.out
-github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:31:	CreateTracking		92.6%
-github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:81:	coordinateValue		100.0%
-github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:93:	validLatitude		100.0%
-github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:97:	validLongitude		100.0%
-github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:101:	validCoordinate		100.0%
-github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:29:		NewRabbitMQPublisher	0.0%
-github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:65:		PublishTracking		0.0%
-github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:90:		Close			0.0%
-github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:103:		amqpURL			0.0%
-github.com/Frota-Facil/tracking-service/internal/server/server.go:18:			New			100.0%
-github.com/Frota-Facil/tracking-service/internal/server/server.go:31:			healthHandler		100.0%
-github.com/Frota-Facil/tracking-service/internal/server/server.go:38:			requestLogger		100.0%
-github.com/Frota-Facil/tracking-service/internal/server/server.go:51:			writeJSON		100.0%
-total:											(statements)		61.3%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:31:	CreateTracking			92.6%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:81:	coordinateValue			100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:93:	validLatitude			100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:97:	validLongitude			100.0%
+github.com/Frota-Facil/tracking-service/internal/handlers/tracking_handler.go:101:	validCoordinate			100.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:34:		PublishWithContext		0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:38:		IsClosed			0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:45:		Close				0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:75:		dialRabbitMQ			0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:108:		NewRabbitMQPublisher		0.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:112:		newRabbitMQPublisherWithDial	75.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:125:		reconnectLocked			100.0%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:140:		PublishTracking			82.4%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:192:		Close				77.8%
+github.com/Frota-Facil/tracking-service/internal/messaging/rabbitmq.go:209:		amqpURL				100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:18:			New				100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:31:			healthHandler			100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:38:			requestLogger			100.0%
+github.com/Frota-Facil/tracking-service/internal/server/server.go:51:			writeJSON			100.0%
+total:											(statements)			68.1%
 
