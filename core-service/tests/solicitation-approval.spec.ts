@@ -73,7 +73,7 @@ describe("aprovação de solicitação pelo administrador", () => {
 
 		vi.mocked(createAuditLog).mockResolvedValue(undefined);
 		vi.mocked(createRequestApprovedNotificationUseCase).mockResolvedValue(
-			undefined,
+			undefined as never,
 		);
 		vi.mocked(notifyDriverAboutRequestApproved).mockResolvedValue(undefined);
 		vi.mocked(sendPushNotificationToUser).mockResolvedValue(undefined);

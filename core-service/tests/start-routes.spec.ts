@@ -72,11 +72,12 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			process.env.POSTGRES_PORT = parsedDatabaseUrl.port || "5432";
 			process.env.POSTGRES_DB = databaseName;
 
-			({ db } = await import("@/drizzle/client"));
-			({ default: jwtPlugin } = await import("@/plugins/jwt"));
-			({ routeRouter } = await import("@/routes/route-router"));
-			({ routeEventRouter } = await import("@/routes/route-event-router"));
-			({ createAuditLog } = await import("@/use-cases/audit-log-service"));
+			({ db } = await import("@/drizzle/client.js"));
+			jwtPlugin = (await import("@/plugins/jwt.js"))
+				.default as unknown as typeof jwtPlugin;
+			({ routeRouter } = await import("@/routes/route-router.js"));
+			({ routeEventRouter } = await import("@/routes/route-event-router.js"));
+			({ createAuditLog } = await import("@/use-cases/audit-log-service.js"));
 			const schema = await db.execute(sql`
 			SELECT
 				to_regclass('public.users') AS users,

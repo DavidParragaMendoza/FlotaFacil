@@ -82,17 +82,17 @@ describe("rejeição de solicitação pelo administrador", () => {
 
 		vi.mocked(createAuditLog).mockResolvedValue(undefined);
 		vi.mocked(createRequestRejectedNotificationUseCase).mockResolvedValue(
-			undefined,
+			undefined as never,
 		);
 		vi.mocked(notifyDriverAboutRequestRejected).mockResolvedValue(undefined);
 		vi.mocked(sendPushNotificationToUser).mockResolvedValue(undefined);
 		vi.mocked(findRequestById).mockImplementation(async (requestId) =>
-			requestStates.get(requestId) ?? null,
+			requestStates.get(requestId),
 		);
 		vi.mocked(updateRequestById).mockImplementation(
 			async (requestId, update) => {
 				const request = requestStates.get(requestId);
-				if (!request) return null;
+				if (!request) return undefined;
 				const updatedRequest = { ...request, ...update };
 				requestStates.set(requestId, updatedRequest);
 				return updatedRequest;
@@ -134,7 +134,9 @@ describe("rejeição de solicitação pelo administrador", () => {
 			id: ids.request,
 			status: REQUEST_STATUS.REJECTED,
 		});
-		expect(requestStates.get(ids.request)?.status).toBe(REQUEST_STATUS.REJECTED);
+		expect(requestStates.get(ids.request)?.status).toBe(
+			REQUEST_STATUS.REJECTED,
+		);
 		expect(vehicleState.status).toBe(VEHICLE_STATUS.AVAILABLE);
 		expect(routeStates).toHaveLength(0);
 		expect(updateRequestById).toHaveBeenCalledWith(ids.request, {

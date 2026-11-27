@@ -31,11 +31,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			secondTrack: randomUUID(),
 			otherTrack: randomUUID(),
 		};
-		const requestIds = [
-			ids.existingRoute,
-			ids.emptyRoute,
-			ids.otherRoute,
-		];
+		const requestIds = [ids.existingRoute, ids.emptyRoute, ids.otherRoute];
 		const routeIds = [ids.existingRoute, ids.emptyRoute, ids.otherRoute];
 		const trackIds = [ids.firstTrack, ids.secondTrack, ids.otherTrack];
 		const firstCapturedAt = new Date("2025-01-10T12:00:00.000Z");
@@ -72,9 +68,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			process.env.POSTGRES_PORT = parsedDatabaseUrl.port || "5432";
 			process.env.POSTGRES_DB = databaseName;
 
-			({ db } = await import("@/drizzle/client"));
-			({ default: jwtPlugin } = await import("@/plugins/jwt"));
-			({ trackRouter } = await import("@/routes/track-router"));
+			({ db } = await import("@/drizzle/client.js"));
+			jwtPlugin = (await import("@/plugins/jwt.js"))
+				.default as unknown as typeof jwtPlugin;
+			({ trackRouter } = await import("@/routes/track-router.js"));
 			const schema = await db.execute(sql`
 				SELECT
 					to_regclass('public.users') AS users,

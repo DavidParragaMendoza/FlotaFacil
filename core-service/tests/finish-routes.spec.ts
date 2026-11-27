@@ -76,9 +76,10 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 			process.env.POSTGRES_PORT = parsedDatabaseUrl.port || "5432";
 			process.env.POSTGRES_DB = databaseName;
 
-			({ db } = await import("@/drizzle/client"));
-			({ default: jwtPlugin } = await import("@/plugins/jwt"));
-			({ routeRouter } = await import("@/routes/route-router"));
+			({ db } = await import("@/drizzle/client.js"));
+			jwtPlugin = (await import("@/plugins/jwt.js"))
+				.default as unknown as typeof jwtPlugin;
+			({ routeRouter } = await import("@/routes/route-router.js"));
 			const schema = await db.execute(sql`
 				SELECT
 					to_regclass('public.users') AS users,
@@ -152,7 +153,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				requestIds.map((id, index) => ({
 					id,
 					userId: id === ids.otherUsersRoute ? ids.otherUser : ids.user,
-					vehicleId: id === ids.otherUsersRoute ? ids.otherVehicle : ids.vehicle,
+					vehicleId:
+						id === ids.otherUsersRoute ? ids.otherVehicle : ids.vehicle,
 					status: REQUEST_STATUS.APPROVED,
 					predictedStartDate: new Date(startDate.getTime() + index * 60_000),
 					predictedEndDate: new Date(endDate.getTime() + index * 60_000),
@@ -201,7 +203,7 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
 				.where(inArray(users.id, [ids.user, ids.otherUser]));
 		});
 
-		async function token(userId = ids.user) {
+		async function token(userId: string = ids.user) {
 			if (!app) throw new Error("Aplicação de teste ainda não foi iniciada");
 			return app.jwt.sign({ id: userId, role: USER_ROLES[0] });
 		}
