@@ -1,11 +1,11 @@
 ﻿============================================================
-TC-AI-001 y TC-AI-002 — Suite 1: core-service (Vitest + app.inject)
+TC-AI-001, TC-AI-002 y Regresion INC-ANDY-001 — Suite 1: core-service (Vitest + app.inject)
 ============================================================
-◇ injected env (0) from .env.example // tip: ⌘ override existing { override: true }
+◇ injected env (24) from .env.example // tip: ⌘ override existing { override: true }
 
  RUN  v4.1.10 /app
 
-[03:12:24 UTC] INFO (307): incoming request
+[03:21:51 UTC] INFO (45): incoming request
     reqId: "req-1"
     req: {
       "method": "POST",
@@ -13,13 +13,13 @@ TC-AI-001 y TC-AI-002 — Suite 1: core-service (Vitest + app.inject)
       "host": "localhost:80",
       "remoteAddress": "127.0.0.1"
     }
-[03:12:24 UTC] INFO (307): request completed
+[03:21:51 UTC] INFO (45): request completed
     reqId: "req-1"
     res: {
       "statusCode": 200
     }
-    responseTime: 22.337975000031292
-[03:12:24 UTC] INFO (307): incoming request
+    responseTime: 20.90179400006309
+[03:21:51 UTC] INFO (45): incoming request
     reqId: "req-2"
     req: {
       "method": "POST",
@@ -31,28 +31,31 @@ docker : stderr | tests/andy-ai-reports.spec.ts > TC-AI-001 & TC-AI-002 — Repo
 TC-AI-002 (b): routeId válido con la IA simulada devolviendo 503 -> error controlado y ningún informe parcial guardado 
 > Cuando ai-service responde HTTP 503, generateRouteReportUseCase rechaza la operación y finishRouteUseCase NO guarda 
 informe parcial
-En línea: 6 Carácter: 14
-+ ... vitestOut = docker exec -e NO_COLOR=1 core-service-app-dev-1 npx vite ...
+En línea: 4 Carácter: 14
++ ... vitestOut = docker run --rm -e NO_COLOR=1 -v "${corePath}:/app" -v /a ...
 +                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: (stderr | tests/...informe parcial:String) [], RemoteException
     + FullyQualifiedErrorId : NativeCommandError
  
 Erro ao gerar relatório da rota 550e8400-e29b-41d4-a716-446655440000 Error: Erro ao chamar ai-report-service: 
 {"detail":"AI upstream service unavailable (503)"}
-    at requestRouteReportFromAiService (/app/src/services/ai-report-service.ts:146:9)
+    at buildAiServiceError (/app/src/services/ai-report-service.ts:128:16)
+    at requestRouteReportFromAiService (/app/src/services/ai-report-service.ts:169:9)
     at processTicksAndRejections (node:internal/process/task_queues:105:5)
     at runNextTicks (node:internal/process/task_queues:69:3)
     at processImmediate (node:internal/timers:459:9)
     at generateRouteReportUseCase (/app/src/use-cases/reports/generate-route-report.ts:149:26)
-    at generateAndSaveRouteReport (/app/src/use-cases/routes/finish-route.ts:23:25)
+    at generateAndSaveRouteReport (/app/src/use-cases/routes/finish-route.ts:23:25) {
+  statusCode: 502
+}
 
-[03:12:24 UTC] INFO (307): request completed
+[03:21:51 UTC] INFO (45): request completed
     reqId: "req-2"
     res: {
       "statusCode": 400
     }
-    responseTime: 8.811691000126302
-[03:12:24 UTC] INFO (307): incoming request
+    responseTime: 7.346901000011712
+[03:21:51 UTC] INFO (45): incoming request
     reqId: "req-3"
     req: {
       "method": "POST",
@@ -60,35 +63,50 @@ Erro ao gerar relatório da rota 550e8400-e29b-41d4-a716-446655440000 Error: Err
       "host": "localhost:80",
       "remoteAddress": "127.0.0.1"
     }
-[03:12:24 UTC] INFO (307): request completed
+[03:21:51 UTC] INFO (45): request completed
     reqId: "req-3"
     res: {
       "statusCode": 404
     }
-    responseTime: 2.437679999973625
- ✓ tests/andy-ai-reports.spec.ts (4 tests) 788ms
-       ✓ POST /admin/reports/fleet responde HTTP 200 con routeId coincidente y markdown_content no vacío  672ms
+    responseTime: 1.5107100000604987
+ ✓ tests/andy-ai-reports.spec.ts (5 tests) 144ms
 
  Test Files  1 passed (1)
-      Tests  4 passed (4)
-   Start at  03:11:29
-   Duration  55.53s (transform 47.04s, setup 0ms, import 54.31s, tests 788ms, environment 0ms)
+      Tests  5 passed (5)
+   Start at  03:21:41
+   Duration  9.14s (transform 7.29s, setup 0ms, import 8.68s, tests 144ms, environment 0ms)
 
 
 ============================================================
-TC-AI-001 y TC-AI-002 — Suite 2: ai-service (Pytest + TestClient + Coverage)
+TC-AI-001, TC-AI-002 y Regresion INC-ANDY-001 — Suite 2: ai-service (Pytest + TestClient + Coverage)
 ============================================================
+docker : WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the 
+system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment 
+instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want 
+to suppress this warning.
+En línea: 5 Carácter: 14
++ ... pytestOut = docker run --rm -e PYTHONPATH=/app -v "${aiPath}:/app" ai ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (WARNING: Runnin...s this warning.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+[notice] A new release of pip is available: 25.0.1 -> 26.3
+[notice] To update, run: pip install --upgrade pip
 ============================= test session starts ==============================
 platform linux -- Python 3.12.16, pytest-9.2.0, pluggy-1.7.0 -- /usr/local/bin/python3.12
 cachedir: .pytest_cache
 rootdir: /app
 plugins: cov-7.1.0, anyio-4.13.0
-collecting ... collected 4 items
+collecting ... collected 7 items
 
-tests/test_reports_ai.py::test_tc_ai_001_generate_route_report_success PASSED [ 25%]
-tests/test_reports_ai.py::test_tc_ai_002a_invalid_payload_does_not_call_ai PASSED [ 50%]
-tests/test_reports_ai.py::test_tc_ai_002b_ai_unavailable_returns_502_according_to_contract PASSED [ 75%]
-tests/test_reports_ai.py::test_tc_ai_002b_empty_ai_output_returns_502_without_partial_report PASSED [100%]
+tests/test_reports_ai.py::test_tc_ai_001_generate_route_report_success PASSED [ 14%]
+tests/test_reports_ai.py::test_tc_ai_002a_invalid_payload_does_not_call_ai PASSED [ 28%]
+tests/test_reports_ai.py::test_tc_ai_002b_ai_unavailable_returns_502_according_to_contract PASSED [ 42%]
+tests/test_reports_ai.py::test_tc_ai_002b_empty_ai_output_returns_502_without_partial_report PASSED [ 57%]
+tests/test_reports_ai.py::test_inc_andy_001_fleet_report_endpoint_returns_200 PASSED [ 71%]
+tests/test_reports_ai.py::test_inc_andy_001_fleet_report_invalid_payload_returns_422_without_ai_call PASSED [ 85%]
+tests/test_reports_ai.py::test_inc_andy_001_fleet_report_ai_unavailable_returns_502 PASSED [100%]
 
 =============================== warnings summary ===============================
 ../usr/local/lib/python3.12/site-packages/anyio/pytest_plugin.py:14
@@ -110,13 +128,13 @@ app/errors/__init__.py               0      0   100%
 app/errors/report_errors.py          6      0   100%
 app/main.py                          8      1    88%
 app/routes/__init__.py               0      0   100%
-app/routes/report_routes.py         16      2    88%
+app/routes/report_routes.py         27      5    81%
 app/schemas/__init__.py              0      0   100%
-app/schemas/report.py               56      0   100%
+app/schemas/report.py               67      0   100%
 app/services/__init__.py             0      0   100%
-app/services/openai_service.py      90      9    90%
+app/services/openai_service.py     108     10    91%
 app/utils/__init__.py                0      0   100%
 ----------------------------------------------------
-TOTAL                              184     12    93%
-========================= 4 passed, 1 warning in 4.64s =========================
+TOTAL                              224     16    93%
+========================= 7 passed, 1 warning in 6.01s =========================
 

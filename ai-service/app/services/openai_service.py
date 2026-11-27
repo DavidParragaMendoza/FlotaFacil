@@ -6,7 +6,11 @@ from openai import OpenAI, OpenAIError
 
 from app.config import settings
 from app.errors.report_errors import EmptyReportContentError, ReportGenerationError
-from app.schemas.report import GenerateRouteReportInput, ReportTrack
+from app.schemas.report import (
+    GenerateFleetReportInput,
+    GenerateRouteReportInput,
+    ReportTrack,
+)
 
 
 client = OpenAI(api_key=settings.openai_api_key)
@@ -313,6 +317,74 @@ Payload analisável em JSON:
 
 def generate_route_report(data: GenerateRouteReportInput) -> str:
     prompt = build_route_report_prompt(data)
+
+    try:
+        response = client.responses.create(
+            model=settings.openai_model,
+            input=prompt,
+        )
+    except OpenAIError as error:
+        raise ReportGenerationError() from error
+
+    markdown_content = response.output_text
+
+    if not markdown_content or not markdown_content.strip():
+        raise EmptyReportContentError()
+
+    return markdown_content.strip()
+
+
+FLEET_REPORT_INSTRUCTIONS = """
+Você é um analista administrativo especializado em gestão de frotas públicas.
+Gere um relatório executivo consolidado da frota em Markdown (em português do Brasil),
+usando exclusivamente os dados do payload JSON enviado, sem expor UUIDs ou IDs técnicos.
+"""
+
+
+def _build_fleet_report_payload(data: GenerateFleetReportInput) -> dict[str, Any]:
+    payload = {
+        "period": _dump_for_prompt(data.period),
+        "totals": {
+            "users": len(data.users),
+            "vehicles": len(data.vehicles),
+            "requests": len(data.requests),
+            "routes": len(data.routes),
+        },
+        "users": [
+            _dump_for_prompt(user, exclude={"name"}) for user in data.users
+        ],
+        "vehicles": [
+            _dump_for_prompt(vehicle) for vehicle in data.vehicles
+        ],
+        "requests": [
+            _dump_for_prompt(req, exclude={"approved_by", "created_at", "updated_at"})
+            for req in data.requests
+        ],
+        "routes": [
+            _dump_for_prompt(route, exclude={"created_at", "updated_at"})
+            for route in data.routes
+        ],
+        "extra_context": data.extra_context,
+        "metadata": _remove_technical_identifiers(data.metadata),
+    }
+
+    return _remove_empty_values(payload)
+
+
+def build_fleet_report_prompt(data: GenerateFleetReportInput) -> str:
+    payload = _build_fleet_report_payload(data)
+    payload_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+    return f"""
+{FLEET_REPORT_INSTRUCTIONS}
+
+Payload analisável da frota em JSON:
+{payload_json}
+""".strip()
+
+
+def generate_fleet_report(data: GenerateFleetReportInput) -> str:
+    prompt = build_fleet_report_prompt(data)
 
     try:
         response = client.responses.create(
