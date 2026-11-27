@@ -5,6 +5,14 @@
 
 <br />
 
+<!-- Language Switcher -->
+<p>
+  <img src="https://img.shields.io/badge/Idioma-Espa%C3%B1ol_(Actual)-10B981?style=for-the-badge" alt="Español Actual" />
+  <a href="./README.pt-BR.md">
+    <img src="https://img.shields.io/badge/Mudar_para-Portugu%C3%AAs_(BR)-1E293B?style=for-the-badge&logo=googletranslate&logoColor=white" alt="Ver en Português" />
+  </a>
+</p>
+
 <!-- Navigation Action Buttons -->
 <a href="#-arquitectura-del-sistema">
   <img src="https://img.shields.io/badge/Arquitectura-Microservicios-1D4ED8?style=for-the-badge&logo=diagramsdotnet&logoColor=white" alt="Arquitectura" />
@@ -260,8 +268,12 @@ Toda la documentación del repositorio fue consolidada dentro de **[`docs/`](./d
 ## 👥 Equipos y Créditos
 
 ### 🏗️ Equipo 1 — Desarrollo de Software
-- **João Manoel** *(Product Owner informal — mencionado en el Relatório de Processo)*
-- *(Pendiente de completar la lista completa de integrantes del Equipo 1)*
+| Integrante | Rol / Participación |
+|---|---|
+| **Everton Gean** | Desarrollo de Software — Sistema Integrado de Frotas (SIF) |
+| **João Manoel** | Desarrollo de Software & Product Owner informal *(Relatório de Processo)* |
+| **Sara Lima** | Desarrollo de Software *(y pruebas en Equipo 2)* |
+| **Vitor Júnior** | Desarrollo de Software — Sistema Integrado de Frotas (SIF) |
 
 ### 🧪 Equipo 2 — Calidad y Pruebas de Software (QA)
 | Integrante | Rol / Foco Principal | Rama de Trabajo |

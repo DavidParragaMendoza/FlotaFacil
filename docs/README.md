@@ -5,6 +5,14 @@
 
 <br />
 
+<!-- Language Switcher -->
+<p>
+  <img src="https://img.shields.io/badge/Idioma-Espa%C3%B1ol_(Actual)-10B981?style=for-the-badge" alt="Español Actual" />
+  <a href="./README.pt-BR.md">
+    <img src="https://img.shields.io/badge/Mudar_para-Portugu%C3%AAs_(BR)-1E293B?style=for-the-badge&logo=googletranslate&logoColor=white" alt="Ver en Português" />
+  </a>
+</p>
+
 <!-- Navigation Buttons -->
 <a href="../README.md">
   <img src="https://img.shields.io/badge/%E2%AC%85%EF%B8%8F_Volver_al_Proyecto-0F172A?style=for-the-badge&logo=github&logoColor=white" alt="Volver al README principal" />
@@ -77,10 +85,12 @@ flowchart LR
       <p>Responsable del levantamiento de requisitos, arquitectura de microservicios, modelado de datos, proceso Scrumban e implementación del sistema SIF (<code>core-service</code>, <code>admin-app</code>, <code>App-client</code>, <code>tracking-service</code>, <code>ai-service</code>, <code>notification-service</code>).</p>
       <ul>
         <li><strong>Carpeta asignada:</strong> <a href="./equipo-1-desarrollo/"><code>docs/equipo-1-desarrollo/</code></a></li>
-        <li><strong>Integrantes registrados:</strong>
+        <li><strong>Integrantes:</strong>
           <ul>
-            <li><strong>João Manoel</strong> <em>(Product Owner informal — según Relatório de Processo)</em></li>
-            <li><em>(Resto de integrantes del Equipo 1 pendientes de completar con nombres oficiales)</em></li>
+            <li><strong>Everton Gean</strong></li>
+            <li><strong>João Manoel</strong> <em>(Product Owner informal — Relatório de Processo)</em></li>
+            <li><strong>Sara Lima</strong></li>
+            <li><strong>Vitor Júnior</strong></li>
           </ul>
         </li>
       </ul>
