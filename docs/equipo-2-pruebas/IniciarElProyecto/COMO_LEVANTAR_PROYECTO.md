@@ -34,6 +34,8 @@ Si vas a probar envío de correos, rastreo GPS o reportes con IA, levántalos ta
 docker compose -f notification-service/compose.yml up -d
 docker compose -f tracking-service/docker-compose.yml up -d
 docker compose -f ai-service/compose.yml up -d
+
+docker compose -f ai-service/compose.yml up --build -d
 ```
 
 *(Puedes verificar que todos los contenedores estén arriba ejecutando `docker ps`).*
